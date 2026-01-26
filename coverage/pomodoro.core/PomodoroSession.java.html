@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PomodoroSession.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Java TelegramAPI Module</a> &gt; <a href="index.source.html" class="el_package">pomodoro.core</a> &gt; <span class="el_source">PomodoroSession.java</span></div><h1>PomodoroSession.java</h1><pre class="source lang-java linenums">package pomodoro.core;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.time.Duration;
+import java.time.Instant;
+
+public class PomodoroSession {
+
+<span class="fc" id="L11">    private static final Logger log = LogManager.getLogger(PomodoroSession.class);</span>
+    private final Instant startTime;
+    private Timer timer;
+    private Phase currentPhase;
+    private SessionState state;
+    private int completeWorkingCycles;
+    private boolean warnedAboutLimit;
+    private boolean finished;
+
+<span class="fc" id="L20">    public PomodoroSession(Phase phase, Duration phaseDuration) {</span>
+<span class="pc bpc" id="L21" title="1 of 4 branches missed.">        if (phaseDuration == null || !phaseDuration.isPositive()) {</span>
+<span class="fc" id="L22">            log.error(&quot;Попытка создать PomodoroSession с некорректным Duration {}&quot;, phaseDuration);</span>
+<span class="fc" id="L23">            throw new IllegalArgumentException(&quot;значение Duration должно быть позитивным&quot;);</span>
+        }
+<span class="fc" id="L25">        finished = false;</span>
+<span class="fc" id="L26">        startTime = Instant.now();</span>
+<span class="fc" id="L27">        warnedAboutLimit = false;</span>
+<span class="fc" id="L28">        this.currentPhase = phase;</span>
+<span class="fc" id="L29">        timer = new Timer(currentPhase, phaseDuration);</span>
+<span class="fc" id="L30">    }</span>
+
+    /**
+     * Проверяет не завершена ли сессия до старта таймера
+     * Запускает таймер (текущую фазу)
+     */
+    public void startCurrentPhase(Duration duration) {
+<span class="fc" id="L37">        ensureNotFinished();</span>
+<span class="fc" id="L38">        timer = new Timer(currentPhase, duration);</span>
+<span class="fc" id="L39">        timer.startTimer();</span>
+<span class="fc" id="L40">    }</span>
+
+    /**
+     * Проверяет завершение текущей фазы (остаток заданного интервала)
+     *
+     * @return true если заданный интервал пройден
+     */
+    public boolean isCurrentPhaseFinished() {
+<span class="fc" id="L48">        return timer.isFinished();</span>
+    }
+
+    /**
+     * Завершает текущую фазу без выбора следующей.
+     * Возвращает true, если фаза была WORK и рабочий цикл засчитан.
+     *
+     * @throws IllegalStateException если завершение фазы вызвано, когда таймер ещё не завершил работу
+     */
+    public synchronized boolean completeCurrentPhase() {
+<span class="fc" id="L58">        ensureNotFinished();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (!timer.isFinished()) {</span>
+<span class="fc" id="L60">            log.error(&quot;Завершение фазы вызвано, когда таймер ещё не завершил работу&quot;);</span>
+<span class="fc" id="L61">            throw new IllegalStateException(&quot;Фаза ещё не завершена&quot;);</span>
+        }
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        boolean workCompleted = currentPhase == Phase.WORK;</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (workCompleted) {</span>
+<span class="fc" id="L65">            completeWorkingCycles++;</span>
+        }
+<span class="fc" id="L67">        return workCompleted;</span>
+    }
+
+    /**
+     * Проверяет не завершена ли сессия до начала работы
+     *
+     * @throws IllegalStateException если до старта сессия завершена
+     */
+    private void ensureNotFinished() {
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (finished) {</span>
+<span class="nc" id="L77">            log.error(&quot;Сессия завершена до начала работы таймера&quot;);</span>
+<span class="nc" id="L78">            throw new IllegalStateException(&quot;Сессия уже завершена&quot;);</span>
+        }
+<span class="fc" id="L80">    }</span>
+
+    public Duration getReminingTime() {
+<span class="fc" id="L83">        return timer.remaining();</span>
+    }
+
+    public Phase getCurrentPhase() {
+<span class="fc" id="L87">        return currentPhase;</span>
+    }
+
+    public int getCompleteWorkingCycles() {
+<span class="fc" id="L91">        return completeWorkingCycles;</span>
+    }
+
+    public boolean isFinished() {
+<span class="fc" id="L95">        return finished;</span>
+    }
+
+    public Instant getStartTime() {
+<span class="nc" id="L99">        return startTime;</span>
+    }
+
+    public boolean isWarnedAboutLimit() {
+<span class="fc" id="L103">        return warnedAboutLimit;</span>
+    }
+
+    public void setCurrentPhase(Phase phase) {
+<span class="fc" id="L107">        currentPhase = phase;</span>
+<span class="fc" id="L108">    }</span>
+
+    public synchronized void setWantedAboutLimit(boolean wantedAboutLimit) {
+<span class="nc" id="L111">        this.warnedAboutLimit = wantedAboutLimit;</span>
+<span class="nc" id="L112">    }</span>
+
+    public synchronized void setFinished(boolean finishedFlag) {
+<span class="fc" id="L115">        finished = finishedFlag;</span>
+<span class="fc" id="L116">    }</span>
+
+    public SessionState getState() {
+<span class="fc" id="L119">        return state;</span>
+    }
+
+    public void setState(SessionState state) {
+<span class="fc" id="L123">        this.state = state;</span>
+<span class="fc" id="L124">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

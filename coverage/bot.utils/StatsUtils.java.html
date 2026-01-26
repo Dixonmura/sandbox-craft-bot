@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StatsUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Java TelegramAPI Module</a> &gt; <a href="index.source.html" class="el_package">bot.utils</a> &gt; <span class="el_source">StatsUtils.java</span></div><h1>StatsUtils.java</h1><pre class="source lang-java linenums">package bot.utils;
+
+import pomodoro.core.PomodoroStats;
+
+<span class="fc" id="L5">public class StatsUtils {</span>
+
+    public String getStatsMessage(PomodoroStats stats) {
+<span class="nc" id="L8">        long allWorkMinutes = stats.getWorkMinutes().toMinutes();</span>
+<span class="nc" id="L9">        long allRestMinutes = stats.getRestMinutes().toMinutes();</span>
+
+<span class="nc" id="L11">        long workHours = allWorkMinutes / 60;</span>
+<span class="nc" id="L12">        long workMinutes = allWorkMinutes % 60;</span>
+<span class="nc" id="L13">        long restHours = allRestMinutes / 60;</span>
+<span class="nc" id="L14">        long restMinutes = allRestMinutes % 60;</span>
+
+<span class="nc" id="L16">        return &quot;&quot;&quot;</span>
+                📊 Статистика за последние тридцать дней:
+                -----------------------------------------
+                📌 Провели %d сессий за работой
+                ☕ Провели %d сессий за отдыхом
+                -----------------------------------------
+                💼 Общее время работы: %d час. %d мин.
+                🛋 Общее время отдыха: %d час. %d мин.
+                -----------------------------------------
+<span class="nc" id="L25">                &quot;&quot;&quot;.formatted(</span>
+<span class="nc" id="L26">                stats.getWorkSessions(),</span>
+<span class="nc" id="L27">                stats.getRestSessions(),</span>
+<span class="nc" id="L28">                workHours, workMinutes,</span>
+<span class="nc" id="L29">                restHours, restMinutes</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

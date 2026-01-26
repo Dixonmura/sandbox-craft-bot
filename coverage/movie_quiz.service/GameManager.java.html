@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GameManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Java TelegramAPI Module</a> &gt; <a href="index.source.html" class="el_package">movie_quiz.service</a> &gt; <span class="el_source">GameManager.java</span></div><h1>GameManager.java</h1><pre class="source lang-java linenums">package movie_quiz.service;
+
+import movie_quiz.core.QuestionMovie;
+import movie_quiz.core.GameSession;
+import movie_quiz.core.Movie;
+import movie_quiz.core.QuestionView;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Управляет игровой сессией кино-квиза:
+ * выдаёт вопросы, проверяет ответы и считает очки.
+ */
+public class GameManager {
+
+    private final GameSession gameSession;
+    private final QuestionMovie questionMovie;
+
+    /**
+     * Создаёт менеджер игры на основе списка фильмов.
+     *
+     * @param movieList список доступных фильмов для вопросов
+     */
+<span class="fc" id="L25">    public GameManager(List&lt;Movie&gt; movieList) {</span>
+<span class="fc" id="L26">        this.gameSession = new GameSession(movieList);</span>
+<span class="fc" id="L27">        this.questionMovie = new QuestionMovie(movieList);</span>
+<span class="fc" id="L28">    }</span>
+
+    /**
+     * Возвращает следующий вопрос или пустой {@link Optional},
+     * если игра завершена.
+     *
+     * @return следующий вопрос или пустой Optional при завершении игры
+     */
+    public Optional&lt;QuestionView&gt; getNextQuestion() {
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (gameSession.isFinished()) {</span>
+<span class="fc" id="L38">            return Optional.empty();</span>
+        }
+<span class="fc" id="L40">        return Optional.of(new QuestionView(questionMovie.getQuestions(gameSession)));</span>
+    }
+
+    /**
+     * Проверяет ответ пользователя на текущий вопрос.
+     * Увеличивает счёт и переходит к следующему фильму при верном ответе.
+     *
+     * @param answer ответ пользователя
+     * @return true, если ответ верный, иначе false
+     * @throws IllegalStateException если вопрос ещё не был выдан
+     */
+    public boolean checkAnswer(String answer) {
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (questionMovie.getCurrentMovie() == null) {</span>
+<span class="fc" id="L53">            throw new IllegalStateException(&quot;Нельзя проверять ответ до выдачи вопроса&quot;);</span>
+        }
+<span class="fc" id="L55">        boolean currentAnswer = questionMovie.getAnswer(answer);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (currentAnswer) {</span>
+<span class="fc" id="L57">            gameSession.incrementScore();</span>
+        }
+<span class="fc" id="L59">        gameSession.nextMovie();</span>
+<span class="fc" id="L60">        return currentAnswer;</span>
+    }
+
+    /**
+     * Возвращает текущий фильм в игре.
+     *
+     * @return текущий фильм
+     */
+    public Movie getCurrentMovie() {
+<span class="fc" id="L69">        return gameSession.getCurrentMovie();</span>
+    }
+
+    /**
+     * Возвращает правильный ответ для текущего вопроса.
+     *
+     * @return правильное название фильма
+     */
+    public String getRightAnswer() {
+<span class="fc" id="L78">        return questionMovie.getCorrectTitle();</span>
+    }
+
+    /**
+     * Возвращает текущий счёт игрока.
+     *
+     * @return количество правильных ответов
+     */
+    public int getScore() {
+<span class="fc" id="L87">        return gameSession.getScore();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

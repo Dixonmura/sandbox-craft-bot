@@ -1,0 +1,10 @@
+package pomodoro.core;
+
+public enum SetupStep {
+    NONE,
+    WAITING_WORK_DURATION,
+    WAITING_SHORT_REST_DURATION,
+    WAITING_LONG_REST_DURATION,
+    WAITING_COUNT_CYCLES,
+    READY
+}

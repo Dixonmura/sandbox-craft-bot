@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MovieQuizRank.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Java TelegramAPI Module</a> &gt; <a href="index.source.html" class="el_package">movie_quiz.core</a> &gt; <span class="el_source">MovieQuizRank.java</span></div><h1>MovieQuizRank.java</h1><pre class="source lang-java linenums">package movie_quiz.core;
+
+<span class="fc" id="L3">public enum MovieQuizRank {</span>
+
+<span class="fc" id="L5">    NEWBIE(0, 0, &quot;Зритель по настроению 🙂&quot;),</span>
+<span class="fc" id="L6">    POPCORN_LOVER(1, 5, &quot;Любитель попкорна 🍿&quot;),</span>
+<span class="fc" id="L7">    MOVIE_FAN(6, 10, &quot;Киноман-любитель 🎬&quot;),</span>
+<span class="fc" id="L8">    CRITIC(11, 15, &quot;Домашний кинокритик 🎭&quot;),</span>
+<span class="fc" id="L9">    MOVIE_GURU(16, 20, &quot;Гуру кинозала 🧠🎥&quot;),</span>
+<span class="fc" id="L10">    QUIZ_STAR(21, 30, &quot;Звезда кино-квиза ⭐&quot;),</span>
+<span class="fc" id="L11">    DIRECTOR(31, 40, &quot;Режиссёр своего плейлиста 🎬🎧&quot;),</span>
+<span class="fc" id="L12">    OSCAR_HUNTER(41, 49, &quot;Охотник за Оскарами 🏆&quot;),</span>
+<span class="fc" id="L13">    LEGEND(50, Integer.MAX_VALUE, &quot;Легенда большого экрана 🎞️👑&quot;);</span>
+
+    private final int minInclusive;
+    private final int maxInclusive;
+    private final String title;
+
+<span class="fc" id="L19">    MovieQuizRank(int minInclusive, int maxInclusive, String title) {</span>
+<span class="fc" id="L20">        this.minInclusive = minInclusive;</span>
+<span class="fc" id="L21">        this.maxInclusive = maxInclusive;</span>
+<span class="fc" id="L22">        this.title = title;</span>
+<span class="fc" id="L23">    }</span>
+
+    public String title() {
+<span class="fc" id="L26">        return title;</span>
+    }
+
+    public static String fromScore(int score) {
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        for (MovieQuizRank rank : values()) {</span>
+<span class="pc bpc" id="L31" title="1 of 4 branches missed.">            if (score &gt;= rank.minInclusive &amp;&amp; score &lt;= rank.maxInclusive) {</span>
+<span class="fc" id="L32">                return rank.title();</span>
+            }
+        }
+<span class="nc" id="L35">        return NEWBIE.title();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QuestionMovie.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Java TelegramAPI Module</a> &gt; <a href="index.source.html" class="el_package">movie_quiz.core</a> &gt; <span class="el_source">QuestionMovie.java</span></div><h1>QuestionMovie.java</h1><pre class="source lang-java linenums">package movie_quiz.core;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * Формирует вопросы киноквиза по списку фильмов.
+ * Выдаёт варианты ответов и проверяет правильность ответа.
+ */
+public class QuestionMovie {
+
+    private final List&lt;Movie&gt; listTitles;
+    private Movie currentMovie;
+
+    /**
+     * Создаёт генератор вопросов на основе списка фильмов.
+     *
+     * @param listTitles список фильмов для построения вариантов ответа
+     * @throws IllegalArgumentException если список null или пустой
+     */
+<span class="fc" id="L23">    public QuestionMovie(List&lt;Movie&gt; listTitles) {</span>
+<span class="fc bfc" id="L24" title="All 4 branches covered.">        if (listTitles == null || listTitles.isEmpty()) {</span>
+<span class="fc" id="L25">            throw new IllegalArgumentException(&quot;Список фильмов для построения вопросов не может быть пустым&quot;);</span>
+        }
+<span class="fc" id="L27">        this.listTitles = new ArrayList&lt;&gt;(listTitles);</span>
+<span class="fc" id="L28">    }</span>
+
+    /**
+     * Формирует список вариантов ответа для текущего фильма из сессии.
+     * Варианты включают правильный ответ и до трёх случайных других названий.
+     *
+     * @param session текущая игровая сессия
+     * @return список вариантов ответа (обычно 4 элемента)
+     * @throws IllegalStateException если в сессии нет текущего фильма
+     */
+    public List&lt;String&gt; getQuestions(GameSession session) {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (session.getCurrentMovie() == null) {</span>
+<span class="fc" id="L40">            throw new IllegalStateException(&quot;Нельзя формировать варианты без текущего фильма в сессии&quot;);</span>
+        }
+
+<span class="fc" id="L43">        List&lt;String&gt; questions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L44">        currentMovie = session.getCurrentMovie();</span>
+
+<span class="fc" id="L46">        questions.add(currentMovie.title());</span>
+
+<span class="fc" id="L48">        ThreadLocalRandom random = ThreadLocalRandom.current();</span>
+
+<span class="fc bfc" id="L50" title="All 4 branches covered.">        while (questions.size() &lt; 4 &amp;&amp; questions.size() &lt; listTitles.size()) {</span>
+<span class="fc" id="L51">            int index = random.nextInt(listTitles.size());</span>
+<span class="fc" id="L52">            Movie candidate = listTitles.get(index);</span>
+
+<span class="fc" id="L54">            String title = candidate.title();</span>
+<span class="fc bfc" id="L55" title="All 4 branches covered.">            if (!title.equals(currentMovie.title()) &amp;&amp; !questions.contains(title)) {</span>
+<span class="fc" id="L56">                questions.add(title);</span>
+            }
+<span class="fc" id="L58">        }</span>
+
+<span class="fc" id="L60">        Collections.shuffle(questions);</span>
+<span class="fc" id="L61">        return questions;</span>
+    }
+
+    /**
+     * Проверяет, совпадает ли переданное название с текущим фильмом.
+     *
+     * @param title ответ пользователя
+     * @return true, если ответ верный, иначе false
+     * @throws IllegalStateException если текущий фильм не установлен
+     */
+    public boolean getAnswer(String title) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (currentMovie == null) {</span>
+<span class="fc" id="L73">            throw new IllegalStateException(&quot;Текущий фильм не установлен, невозможно проверить ответ&quot;);</span>
+        }
+<span class="fc" id="L75">        return currentMovie.title().equalsIgnoreCase(title);</span>
+    }
+
+    /**
+     * Возвращает правильное название текущего фильма.
+     *
+     * @return правильное название фильма
+     * @throws IllegalStateException если текущий фильм не установлен
+     */
+    public String getCorrectTitle() {
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (currentMovie == null) {</span>
+<span class="fc" id="L86">            throw new IllegalStateException(&quot;Текущий фильм не установлен&quot;);</span>
+        }
+<span class="fc" id="L88">        return currentMovie.title();</span>
+    }
+
+    public Movie getCurrentMovie() {
+<span class="fc" id="L92">        return currentMovie;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

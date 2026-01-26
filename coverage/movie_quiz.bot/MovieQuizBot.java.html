@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="ru"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MovieQuizBot.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Java TelegramAPI Module</a> &gt; <a href="index.source.html" class="el_package">movie_quiz.bot</a> &gt; <span class="el_source">MovieQuizBot.java</span></div><h1>MovieQuizBot.java</h1><pre class="source lang-java linenums">package movie_quiz.bot;
+
+import bot.utils.CsvResourceReader;
+import movie_quiz.service.GameManager;
+import movie_quiz.core.Movie;
+import movie_quiz.core.MovieQuizRank;
+import movie_quiz.core.QuestionView;
+import org.apache.logging.log4j.LogManager;
+import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Основной сервис кино-квиза.
+ * Управляет сессиями игр, стартом и обработкой ответов.
+ */
+public class MovieQuizBot {
+
+<span class="fc" id="L26">    private static final org.apache.logging.log4j.Logger log = LogManager.getLogger(MovieQuizBot.class);</span>
+    private final List&lt;Movie&gt; movies;
+<span class="fc" id="L28">    private final Map&lt;Long, GameManager&gt; sessions = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L30">    public MovieQuizBot() {</span>
+<span class="fc" id="L31">        CsvResourceReader reader = new CsvResourceReader();</span>
+
+<span class="fc" id="L33">        try (InputStream is = getClass()</span>
+<span class="fc" id="L34">                .getClassLoader()</span>
+<span class="fc" id="L35">                .getResourceAsStream(&quot;assets/movies/movies.csv&quot;)) {</span>
+
+<span class="fc" id="L37">            this.movies = reader.read(is, ',', row -&gt; new Movie(row[0], row[1]));</span>
+<span class="nc" id="L38">        } catch (IOException e) {</span>
+<span class="nc" id="L39">            log.error(&quot;Не удалось прочитать файл movies.csv&quot;, e);</span>
+<span class="nc" id="L40">            throw new UncheckedIOException(e);</span>
+<span class="fc" id="L41">        }</span>
+<span class="fc" id="L42">    }</span>
+
+<span class="fc" id="L44">    public MovieQuizBot(List&lt;Movie&gt; listMovies) {</span>
+<span class="fc" id="L45">        this.movies = listMovies;</span>
+<span class="fc" id="L46">    }</span>
+
+    /**
+     * Запускает новую игру для пользователя и возвращает первый вопрос.
+     */
+    public BotReply startGame(Update update) {
+<span class="fc" id="L52">        Long chatId = update.getMessage().getChatId();</span>
+<span class="fc" id="L53">        GameManager manager = new GameManager(movies);</span>
+<span class="fc" id="L54">        sessions.put(chatId, manager);</span>
+
+<span class="fc" id="L56">        QuestionView movieTitles = manager.getNextQuestion().orElseThrow();</span>
+<span class="fc" id="L57">        Movie current = manager.getCurrentMovie();</span>
+
+<span class="fc" id="L59">        log.info(&quot;Старт новой сессии MovieQuiz для chatId={}&quot;, chatId);</span>
+
+<span class="fc" id="L61">        return new BotReply(&quot;Угадай фильм по кадру \uD83C\uDFA5✨&quot;,</span>
+<span class="fc" id="L62">                movieTitles.movieTitles(),</span>
+                false,
+<span class="fc" id="L64">                current.imageFileName());</span>
+    }
+
+    /**
+     * Обрабатывает ответ пользователя и возвращает следующий шаг игры.
+     */
+    public BotReply handleAnswer(Update update) {
+<span class="fc" id="L71">        Long chatId = update.getMessage().getChatId();</span>
+<span class="fc" id="L72">        GameManager manager = sessions.get(chatId);</span>
+<span class="fc" id="L73">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L74">        Message message = update.getMessage();</span>
+
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (manager == null) {</span>
+<span class="fc" id="L77">            log.warn(&quot;Ответ без активной игровой сессии: manager is null, chatId={}&quot;, chatId);</span>
+<span class="fc" id="L78">            builder.append(&quot;Игры не существует! \uD83D\uDEAB\n&quot;)</span>
+<span class="fc" id="L79">                    .append(&quot;Сначала начните новую игру с помощью команды «/playMovieQuiz» \uD83C\uDFAC\n&quot;);</span>
+<span class="fc" id="L80">            return new BotReply(builder.toString(),</span>
+<span class="fc" id="L81">                    List.of(),</span>
+                    true,
+                    null);
+        }
+
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (message.getText().equalsIgnoreCase(&quot;Завершить игру \uD83C\uDFAC\uD83C\uDFC1&quot;)) {</span>
+<span class="nc" id="L87">            builder.append(&quot;Игра завершена по вашему желанию! \uD83C\uDFAC Вы набрали &quot;)</span>
+<span class="nc" id="L88">                    .append(manager.getScore())</span>
+<span class="nc" id="L89">                    .append(&quot; очков. \uD83C\uDFC6\n&quot;)</span>
+<span class="nc" id="L90">                    .append(&quot;Вам присваивается звание: &quot;)</span>
+<span class="nc" id="L91">                    .append(MovieQuizRank.fromScore(manager.getScore()));</span>
+
+<span class="nc" id="L93">            sessions.remove(chatId);</span>
+<span class="nc" id="L94">            log.info(&quot;Завершение игровой сессии по желанию игрока, chatId={}&quot;, chatId);</span>
+
+<span class="nc" id="L96">            return new BotReply(builder.toString(), List.of(), true, null);</span>
+        }
+
+<span class="fc" id="L99">        boolean checkAnswer = manager.checkAnswer(message.getText());</span>
+
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (!checkAnswer) {</span>
+<span class="fc" id="L102">            String rightAnswer = manager.getRightAnswer();</span>
+<span class="fc" id="L103">            builder.append(&quot;К сожалению ответ не верный. \uD83D\uDE14\n&quot;)</span>
+<span class="fc" id="L104">                    .append(&quot;Правильный ответ: &quot;)</span>
+<span class="fc" id="L105">                    .append(rightAnswer)</span>
+<span class="fc" id="L106">                    .append(&quot; ✅\n\n&quot;);</span>
+<span class="fc" id="L107">        } else {</span>
+<span class="fc" id="L108">            builder.append(&quot;Это правильный ответ! \uD83C\uDF89 &quot;)</span>
+<span class="fc" id="L109">                    .append(&quot;Поздравляем! \uD83C\uDFC6&quot;)</span>
+<span class="fc" id="L110">                    .append(&quot;\nВаши очки: &quot;)</span>
+<span class="fc" id="L111">                    .append(manager.getScore())</span>
+<span class="fc" id="L112">                    .append(&quot; ⭐\n\n&quot;);</span>
+        }
+
+<span class="fc" id="L115">        Optional&lt;QuestionView&gt; questions = manager.getNextQuestion();</span>
+
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (questions.isEmpty()) {</span>
+<span class="fc" id="L118">            builder.append(&quot;Игра завершена! \uD83C\uDFAC Вы набрали &quot;)</span>
+<span class="fc" id="L119">                    .append(manager.getScore())</span>
+<span class="fc" id="L120">                    .append(&quot; очков. \uD83C\uDFC6\n&quot;)</span>
+<span class="fc" id="L121">                    .append(&quot;Вам присваивается звание: &quot;)</span>
+<span class="fc" id="L122">                    .append(MovieQuizRank.fromScore(manager.getScore()));</span>
+
+<span class="fc" id="L124">            sessions.remove(chatId);</span>
+<span class="fc" id="L125">            log.info(&quot;Завершение игровой сессии по логике игры, chatId={}&quot;, chatId);</span>
+
+<span class="fc" id="L127">            return new BotReply(builder.toString(), List.of(), true, null);</span>
+        } else {
+<span class="nc" id="L129">            Movie current = manager.getCurrentMovie();</span>
+<span class="nc" id="L130">            List&lt;String&gt; titles = questions.get().movieTitles();</span>
+<span class="nc" id="L131">            builder.append(&quot;Следующий вопрос: ➡\uFE0F\n&quot;);</span>
+<span class="nc" id="L132">            return new BotReply(builder.toString(), titles, false, current.imageFileName());</span>
+        }
+    }
+
+    public boolean hasSession(Long chatID) {
+<span class="nc" id="L137">        return sessions.containsKey(chatID);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
