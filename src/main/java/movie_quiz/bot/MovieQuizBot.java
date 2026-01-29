@@ -58,7 +58,7 @@ public class MovieQuizBot {
 
         log.info("Старт новой сессии MovieQuiz для chatId={}", chatId);
 
-        return new BotReply("Угадай фильм по кадру \uD83C\uDFA5✨",
+        return new BotReply(MovieQuizMessages.GUESS_MOVIE,
                 movieTitles.movieTitles(),
                 false,
                 current.imageFileName());
@@ -75,21 +75,17 @@ public class MovieQuizBot {
 
         if (manager == null) {
             log.warn("Ответ без активной игровой сессии: manager is null, chatId={}", chatId);
-            builder.append("Игры не существует! \uD83D\uDEAB\n")
-                    .append("Сначала начните новую игру с помощью команды «/playMovieQuiz» \uD83C\uDFAC\n");
+            builder.append(MovieQuizMessages.ANSWER_WITHOUT_SESSION);
             return new BotReply(builder.toString(),
                     List.of(),
                     true,
                     null);
         }
 
-        if (message.getText().equalsIgnoreCase("Завершить игру \uD83C\uDFAC\uD83C\uDFC1")) {
-            builder.append("Игра завершена по вашему желанию! \uD83C\uDFAC Вы набрали ")
-                    .append(manager.getScore())
-                    .append(" очков. \uD83C\uDFC6\n")
-                    .append("Вам присваивается звание: ")
-                    .append(MovieQuizRank.fromScore(manager.getScore()));
-
+        if (message.getText().equalsIgnoreCase(MovieQuizMessages.END_GAME_BUTTON)) {
+            int score = manager.getScore();
+            String rank = MovieQuizRank.fromScore(score);
+            builder.append(String.format(MovieQuizMessages.ANSWER_END_GAME_WITH_RANK, score, rank));
             sessions.remove(chatId);
             log.info("Завершение игровой сессии по желанию игрока, chatId={}", chatId);
 
@@ -100,26 +96,19 @@ public class MovieQuizBot {
 
         if (!checkAnswer) {
             String rightAnswer = manager.getRightAnswer();
-            builder.append("К сожалению ответ не верный. \uD83D\uDE14\n")
-                    .append("Правильный ответ: ")
-                    .append(rightAnswer)
-                    .append(" ✅\n\n");
+            builder.append(String.format(MovieQuizMessages.WRONG_ANSWER, rightAnswer));
         } else {
-            builder.append("Это правильный ответ! \uD83C\uDF89 ")
-                    .append("Поздравляем! \uD83C\uDFC6")
-                    .append("\nВаши очки: ")
-                    .append(manager.getScore())
-                    .append(" ⭐\n\n");
+            builder.append(String.format(MovieQuizMessages.RIGHT_ANSWER, manager.getScore()));
         }
 
         Optional<QuestionView> questions = manager.getNextQuestion();
 
         if (questions.isEmpty()) {
-            builder.append("Игра завершена! \uD83C\uDFAC Вы набрали ")
-                    .append(manager.getScore())
-                    .append(" очков. \uD83C\uDFC6\n")
-                    .append("Вам присваивается звание: ")
-                    .append(MovieQuizRank.fromScore(manager.getScore()));
+            int score = manager.getScore();
+            builder.append(String.format(
+                    MovieQuizMessages.END_GAME_MESSAGE,
+                    score,
+                    MovieQuizRank.fromScore(score)));
 
             sessions.remove(chatId);
             log.info("Завершение игровой сессии по логике игры, chatId={}", chatId);
@@ -128,7 +117,7 @@ public class MovieQuizBot {
         } else {
             Movie current = manager.getCurrentMovie();
             List<String> titles = questions.get().movieTitles();
-            builder.append("Следующий вопрос: ➡\uFE0F\n");
+            builder.append(MovieQuizMessages.NEXT_QUESTION);
             return new BotReply(builder.toString(), titles, false, current.imageFileName());
         }
     }

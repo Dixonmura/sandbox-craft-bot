@@ -3,7 +3,6 @@ package bot.utils;
 import pomodoro.core.Phase;
 import pomodoro.core.PomodoroStats;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,6 +11,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * Считает статистику Pomodoro за последние 30 дней по CSV-файлу пользователя.
+ * Агрегирует длительность работы и отдыха и количество завершённых рабочих сессий и
+ * сессий отдыха.
+ */
 public class CsvStatsReader implements StatsReader {
 
     private final Path baseDir;
@@ -37,7 +41,7 @@ public class CsvStatsReader implements StatsReader {
 
         try (InputStream inputStream = Files.newInputStream(file)) {
             rawEvents = reader.read(inputStream, ',', raw -> new RawEvent(raw[0], raw[1], raw[2]));
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException("Ошибка чтения CSV", e);
         }
 
@@ -47,7 +51,7 @@ public class CsvStatsReader implements StatsReader {
         for (RawEvent event : rawEvents) {
             Phase currentPhase = (Phase.valueOf(event.phase()));
             Instant finishedAt = Instant.ofEpochSecond(Long.parseLong(event.finishedAt()));
-            Duration duration = Duration.ofMinutes(Long.parseLong(event.durationSeconds()));
+            Duration duration = Duration.ofMinutes(Long.parseLong(event.durationMinutes()));
             if (finishedAt.isAfter(monthAgo)) {
                 switch (currentPhase) {
                     case WORK -> {
@@ -72,5 +76,5 @@ public class CsvStatsReader implements StatsReader {
     }
 }
 
-record RawEvent(String phase, String durationSeconds, String finishedAt) {
+record RawEvent(String phase, String durationMinutes, String finishedAt) {
 }

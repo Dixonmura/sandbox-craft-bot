@@ -57,19 +57,6 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
     }
 
     /**
-     * Конструктор для явной передачи экземпляра {@link MovieQuizBot} и {@link PomodoroBot}
-     * (удобно для тестов).
-     *
-     * @param client  Telegram-клиент
-     * @param quizBot экземпляр квиз-бота
-     */
-    BotRouter(TelegramClient client, MovieQuizBot quizBot, PomodoroBot pomodoroBot) {
-        this.client = client;
-        this.movieQuizBot = quizBot;
-        this.commandDispatcher = new CommandDispatcher(client, quizBot, pomodoroBot);
-    }
-
-    /**
      * Обрабатывает входящее обновление Telegram.
      * <ul>
      *     <li>Игнорирует обновления без текстового сообщения.</li>
@@ -124,6 +111,7 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
                 } catch (TelegramApiException e) {
                     log.error("Ошибка при отправке ответа Pomodoro в чат chatId={}", chatId, e);
                 }
+                return;
             }
             if (!movieQuizBot.hasSession(chatId) && !pomodoroBot.hasSession(chatId)) {
                 log.info("Получена команда '{}' от chatId={}", messageText, chatId);

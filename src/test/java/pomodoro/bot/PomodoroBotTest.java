@@ -1,14 +1,33 @@
 package pomodoro.bot;
 
+import bot.utils.CsvStatsReader;
+import bot.utils.StatsUtils;
+import bot.utils.StatsWriter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.chat.Chat;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
+import pomodoro.core.*;
+import pomodoro.service.PomodoroManager;
+import pomodoro.service.StatsLogger;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -21,11 +40,36 @@ class PomodoroBotTest {
 
     @Mock
     private PomodoroSender senderMock;
+    @Mock
+    private PomodoroManager manager;
+    @Mock
+    private StatsLogger statsLogger;
+    @Mock
+    private PomodoroSession session;
+    @Mock
+    CsvStatsReader reader;
+    private PomodoroBot pomodoroBotTest;
     private PomodoroBot pomodoroBot;
 
     @BeforeEach
     void setUp() {
         pomodoroBot = new PomodoroBot(senderMock);
+        Map<Phase, List<MotivationPhoto>> motivationPhotos = Map.of(
+                Phase.WORK, List.of(new MotivationPhoto("work1", "path")),
+                Phase.SHORT_BREAK, List.of(new MotivationPhoto("rest1", "path")),
+                Phase.LONG_BREAK, List.of(new MotivationPhoto("rest2", "path"))
+        );
+        StatsUtils statsUtils = new StatsUtils();
+        ScheduledExecutorService scheduled = Executors.newSingleThreadScheduledExecutor();
+        pomodoroBotTest = new PomodoroBot(
+                senderMock,
+                manager,
+                motivationPhotos,
+                statsLogger,
+                reader,
+                statsUtils,
+                scheduled
+        );
     }
 
     @Test
@@ -146,6 +190,204 @@ class PomodoroBotTest {
                 argThat(r -> r.text().contains("Сессия завершена") && r.isFinished()));
         assertThat(reply.text()).isEmpty();
     }
+
+    @Test
+    @DisplayName("Завершение сеанса: логирует финальную фазу и отправляет статистику")
+    void finishSession_shouldLogAndSendStats() {
+
+        PomodoroStats stats = new PomodoroStats();
+        stats.setRestSessions(1);
+        stats.setWorkSessions(2);
+        stats.setWorkMinutes(Duration.ofMinutes(50));
+        stats.setRestMinutes(Duration.ofMinutes(5));
+
+        when(session.getState()).thenReturn(SessionState.RUNNING);
+        when(manager.getSession(CHAT_ID)).thenReturn(session);
+        when(reader.readMonthlyStats(CHAT_ID)).thenReturn(stats);
+
+        Update endUpdate = createUpdateWithText(CHAT_ID, "Завершить сеанс ✅");
+        PomodoroReply reply = pomodoroBotTest.handleAnswer(endUpdate);
+
+        verify(senderMock).sendPomodoroReply(
+                eq(CHAT_ID),
+                argThat(msg ->
+                        msg.text().contains("Сессия завершена. ✅")
+                                && msg.isFinished()
+                )
+        );
+
+        verify(senderMock).sendFinalStatsQuestion(
+                eq(CHAT_ID),
+                argThat(text ->
+                        text.contains("📊 Хотите вывести статистику за последние 30 дней?")
+                )
+        );
+
+        Update finishUpdate = createUpdateWithText(CHAT_ID, "Да 📊");
+        pomodoroBotTest.handleAnswer(finishUpdate);
+
+        verify(senderMock, atLeastOnce()).sendPomodoroReply(eq(CHAT_ID),
+                argThat(msg ->
+                        msg.text().contains("Статистика за последние тридцать дней")
+                                && msg.text().contains("Провели 2 сессий за работой")
+                                && msg.text().contains("Общее время работы: 0 час. 50 мин.")
+                                && msg.isFinished()
+                )
+        );
+
+        assertThat(reply.text()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("logCurrentPhase логирует WORK, SHORT_BREAK и LONG_BREAK с верной длительностью")
+    void logCurrentPhase_shouldLogAllPhasesWithCorrectDurations() {
+        PomodoroServiceSettings settings = new PomodoroServiceSettings(
+                Duration.ofMinutes(25),
+                Duration.ofMinutes(5),
+                Duration.ofMinutes(15),
+                3
+        );
+
+        when(manager.getSession(CHAT_ID)).thenReturn(session);
+
+        when(session.getCurrentPhase()).thenReturn(Phase.WORK);
+        pomodoroBotTest.logCurrentPhase(CHAT_ID, settings);
+
+        when(session.getCurrentPhase()).thenReturn(Phase.SHORT_BREAK);
+        pomodoroBotTest.logCurrentPhase(CHAT_ID, settings);
+
+        when(session.getCurrentPhase()).thenReturn(Phase.LONG_BREAK);
+        pomodoroBotTest.logCurrentPhase(CHAT_ID, settings);
+
+        InOrder inOrder = inOrder(statsLogger);
+
+        inOrder.verify(statsLogger).logPhase(
+                eq(CHAT_ID),
+                eq(Phase.WORK),
+                eq(Duration.ofMinutes(25)),
+                any()
+        );
+        inOrder.verify(statsLogger).logPhase(
+                eq(CHAT_ID),
+                eq(Phase.SHORT_BREAK),
+                eq(Duration.ofMinutes(5)),
+                any()
+        );
+        inOrder.verify(statsLogger).logPhase(
+                eq(CHAT_ID),
+                eq(Phase.LONG_BREAK),
+                eq(Duration.ofMinutes(15)),
+                any()
+        );
+    }
+
+
+    @Test
+    @DisplayName("onPhaseFinished: при превышении лимита обновляет статистику, шлёт финальное сообщение и завершает сессию")
+    void onPhaseFinished_shouldUpdateStatsSendMessageAndEndSession_whenOverLimit() {
+
+        PomodoroServiceSettings settings = new PomodoroServiceSettings(
+                Duration.ofMinutes(25),
+                Duration.ofMinutes(5),
+                Duration.ofMinutes(15),
+                3
+        );
+        when(session.getCurrentPhase()).thenReturn(Phase.WORK);
+        when(manager.getSession(CHAT_ID)).thenReturn(session);
+        when(manager.chooseMotivationForSession(session)).thenReturn(new MotivationPhoto(
+                "path", "motivationTitle"));
+        when(manager.getSettings(CHAT_ID)).thenReturn(settings);
+        when(manager.isOverLimit(session)).thenReturn(true);
+        when(manager.getNextPhase(session, CHAT_ID)).thenReturn(Phase.LONG_BREAK);
+
+        pomodoroBotTest.onPhaseFinished(CHAT_ID);
+
+        verify(senderMock).sendPomodoroReply(eq(CHAT_ID),
+                argThat(msg ->
+                        msg.text().contains("превысила лимит времени существования")
+                                && msg.text().contains("Вам присваивается звание")
+                                && msg.isFinished()
+                )
+        );
+        verify(statsLogger).logPhase(
+                eq(CHAT_ID),
+                eq(Phase.WORK),
+                eq(Duration.ofMinutes(25)),
+                any(Instant.class)
+        );
+        verify(session).completeCurrentPhase();
+        verify(manager).endSession(CHAT_ID);
+        verify(manager).cancelFuture(CHAT_ID);
+        verify(senderMock, times(2)).sendPomodoroReply(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("onPhaseFinished: при следующей фазе WORK стартует рабочий цикл")
+    void onPhaseFinished_shouldStartWorkPhase_whenNextPhaseIsWork() {
+        PomodoroServiceSettings settings = new PomodoroServiceSettings(
+                Duration.ofMinutes(25),
+                Duration.ofMinutes(5),
+                Duration.ofMinutes(15),
+                3
+        );
+
+        when(manager.getSession(CHAT_ID)).thenReturn(session);
+        when(manager.getSettings(CHAT_ID)).thenReturn(settings);
+        when(manager.isOverLimit(session)).thenReturn(false);
+        when(session.isWarnedAboutLimit()).thenReturn(true);
+        when(manager.getNextPhase(session, CHAT_ID)).thenReturn(Phase.WORK);
+        when(manager.chooseMotivationForSession(session))
+                .thenReturn(new MotivationPhoto("path", "motivationTitle"));
+
+        pomodoroBotTest.onPhaseFinished(CHAT_ID);
+
+        verify(senderMock).sendPomodoroReply(
+                eq(CHAT_ID),
+                argThat(msg ->
+                        msg.text().contains("Перерыв окончен, поехали дальше!")
+                                && !msg.isFinished()
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("onPhaseFinished: при приближении к лимиту предупреждает пользователя и ставит флаг")
+    void onPhaseFinished_shouldWarnUserAboutLimit_whenCloseToLimitAndNotWarned() {
+        PomodoroServiceSettings settings = new PomodoroServiceSettings(
+                Duration.ofMinutes(25),
+                Duration.ofMinutes(5),
+                Duration.ofMinutes(15),
+                3
+        );
+
+        when(manager.getSession(CHAT_ID)).thenReturn(session);
+        when(manager.getSettings(CHAT_ID)).thenReturn(settings);
+        when(manager.isOverLimit(session)).thenReturn(false);
+        when(session.isWarnedAboutLimit()).thenReturn(false);
+        when(manager.isCloseToLimit(eq(session), any())).thenReturn(true);
+        when(manager.getNextPhase(session, CHAT_ID)).thenReturn(Phase.SHORT_BREAK);
+        when(manager.chooseMotivationForSession(session))
+                .thenReturn(new MotivationPhoto("path", "motivationTitle"));
+
+        pomodoroBotTest.onPhaseFinished(CHAT_ID);
+        verify(session).setWantedAboutLimit(true);
+        verify(senderMock, times(2)).sendPomodoroReply(anyLong(), any());
+
+        verify(senderMock, atLeastOnce()).sendPomodoroReply(eq(CHAT_ID),
+                argThat(msg ->
+                        msg.text().contains("Уважаемый пользователь, с момента первого запуска")
+                                && msg.text().contains("сессия будет закрыта по достижению лимита")
+                                && !msg.isFinished()
+                )
+        );
+        verify(senderMock, atLeastOnce()).sendPomodoroReply(
+                eq(CHAT_ID),
+                argThat(msg ->
+                        msg.text().contains("Пора сделать короткий перерыв! \uD83E\uDDD8\u200D♂\uFE0F☕")
+                )
+        );
+    }
+
 
     private void setupCompleteSettings(Long chatId) {
         pomodoroBot.startPomodoro(createUpdateWithText(CHAT_ID, "/start"));

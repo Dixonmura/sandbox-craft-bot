@@ -47,7 +47,7 @@ public class PomodoroBot {
         reader = new CsvResourceReader();
         try (InputStream is = getClass()
                 .getClassLoader()
-                .getResourceAsStream("assets/motivations/motivations.csv")) {
+                .getResourceAsStream(PomodoroPaths.RESOURCES_DIR)) {
 
             List<MotivationPhoto> photos = reader.read(is, ',', row -> new MotivationPhoto(row[0], row[1]));
             List<MotivationPhoto> photosForWork = new ArrayList<>();
@@ -74,9 +74,30 @@ public class PomodoroBot {
         pomodoroManager = new PomodoroManager(motivationPhotos);
         scheduled = Executors.newScheduledThreadPool(4);
         StatsWriter writer = new StatsWriter();
-        statsLogger = new StatsLogger(writer, Path.of("Telegram_API/logs"));
-        csvStatsReader = new CsvStatsReader(Path.of("Telegram_API/logs"), Clock.systemDefaultZone(), reader);
+        statsLogger = new StatsLogger(writer, Path.of(PomodoroPaths.LOGS_DIR));
+        csvStatsReader = new CsvStatsReader(Path.of(PomodoroPaths.LOGS_DIR), Clock.systemDefaultZone(), reader);
         statsUtils = new StatsUtils();
+    }
+
+    /**
+     * Конструктор для удобного тестирования
+     */
+    PomodoroBot(PomodoroSender sender,
+                PomodoroManager manager,
+                Map<Phase, List<MotivationPhoto>> motivationPhotos,
+                StatsLogger statsLogger,
+                CsvStatsReader csvStatsReader,
+                StatsUtils statsUtils,
+                ScheduledExecutorService scheduled) {
+        this.sender = sender;
+        this.pomodoroManager = manager;
+        this.motivationPhotos = motivationPhotos;
+        this.statsLogger = statsLogger;
+        this.csvStatsReader = csvStatsReader;
+        this.statsUtils = statsUtils;
+        this.scheduled = scheduled;
+        this.reader = null;
+        this.stateUsers = null;
     }
 
     /**
@@ -91,25 +112,13 @@ public class PomodoroBot {
         state.setStep(SetupStep.WAITING_WORK_DURATION);
         stateUsers.put(chatId, state);
 
-        String text = """
-                Метод «Помодоро» — это работа короткими рывками с паузами 🍅
-                Один «помидор» = сначала работа, потом короткий отдых — так легче не выгореть и не залипать в телефоне 💪
-                
-                Как будем работать:
-                1️⃣ Ты задаёшь длительность рабочего интервала в минутах
-                2️⃣ Я запускаю таймер и напомню, когда пора отдыхать ⏱️
-                3️⃣ За каждый завершённый помидор ты копишь прогресс и получаешь звания 🏅
-                
-                Напиши, на сколько минут поставить первый рабочий интервал (только цифру, число больше 0️⃣).
-                """;
-
         log.info("Первый запуск Pomodoro-бота для пользователя chatId={}", chatId);
 
         pomodoroManager.addSession(chatId, new PomodoroSession(
                 Phase.WORK,
                 Duration.ofMinutes(25)));
 
-        return new PomodoroReply(text, null, true);
+        return new PomodoroReply(PomodoroMessages.WELCOME_MESSAGE, null, true);
     }
 
     /**
@@ -125,44 +134,42 @@ public class PomodoroBot {
         }
 
         if (!update.hasMessage() || !update.getMessage().hasText()) {
-            return new PomodoroReply("Не понял сообщение \uD83E\uDD14\n" +
-                    "Для нужной команды нажмите на соответствующую кнопку на клавиатуре ниже ⬇\uFE0F",
+            return new PomodoroReply(PomodoroMessages.DONT_UNDERSTAND_MESSAGE,
                     null, false);
         } else {
             String textMessage = update.getMessage().getText();
             PomodoroServiceSettings settings = pomodoroManager.getSettings(chatId);
 
-            if (textMessage.equalsIgnoreCase("Старт \uD83D\uDE80")) {
+            if (textMessage.equalsIgnoreCase(PomodoroMessages.START_MESSAGE)) {
                 if (pomodoroManager.getSession(chatId).getState().equals(SessionState.WAITING)) {
                     pomodoroManager.startWorkSession(chatId, settings.workDuration());
                     sender.sendPomodoroReply(chatId, new PomodoroReply(
-                            "Отличный настрой! Отсчет пошел! ⏱\uFE0F",
+                            PomodoroMessages.MOTIVATION_REPLY,
                             pomodoroManager.chooseMotivationForSession(pomodoroManager.getSession(chatId)).pathToPhoto(),
                             false));
                     pomodoroManager.getSession(chatId).setState(SessionState.RUNNING);
                     scheduledPhaseEnd(chatId, settings.workDuration());
                 } else if (pomodoroManager.getSession(chatId).getState().equals(SessionState.RUNNING)) {
                     sender.sendPomodoroReply(chatId, new PomodoroReply(
-                            "Тссс… сессия уже идёт \uD83E\uDD2B\n" +
-                                    "Подождите завершения текущего цикла ⏳",
+                            PomodoroMessages.DOUBLE_CALL,
                             null,
                             false));
                 }
-            } else if (textMessage.equalsIgnoreCase("Пауза ⏸\uFE0F")) {
+            } else if (textMessage.equalsIgnoreCase(PomodoroMessages.PAUSE_MESSAGE)) {
                 pomodoroManager.cancelFuture(chatId);
                 pomodoroManager.getSession(chatId).setState(SessionState.WAITING);
-                sender.sendPomodoroReply(chatId, new PomodoroReply("Текущий цикл отменён ⏹\uFE0F", null, false));
-            } else if (textMessage.equalsIgnoreCase("Завершить сеанс ✅")) {
+                sender.sendPomodoroReply(chatId, new PomodoroReply(PomodoroMessages.CANSEL_CURRENT_CYCLE, null, false));
+            } else if (textMessage.equalsIgnoreCase(PomodoroMessages.END_SEANCE_MESSAGE)) {
                 closingMessage(builder, chatId);
                 pomodoroManager.cancelFuture(chatId);
                 sender.sendPomodoroReply(chatId, new PomodoroReply(builder.toString(), null, true));
-                sender.sendFinalStatsQuestion(chatId, "📊 Хотите вывести статистику за последние 30 дней?");
+                sender.sendFinalStatsQuestion(chatId, PomodoroMessages.QUESTION_STATS_MESSAGE);
             } else if (textMessage.equalsIgnoreCase("Да 📊")) {
                 stats = csvStatsReader.readMonthlyStats(chatId);
                 sender.sendPomodoroReply(chatId, new PomodoroReply(statsUtils.getStatsMessage(stats), null, true));
                 log.info("Завершена сессия для пользователя chatId={}", chatId);
                 pomodoroManager.endSession(chatId);
-            } else if (textMessage.equalsIgnoreCase("Нет ❌")) {
+            } else if (textMessage.equalsIgnoreCase(PomodoroMessages.NO_ANSWER_MESSAGE)) {
                 sender.sendPomodoroReply(chatId, new PomodoroReply(statsUtils.getStatsMessage(stats), null, true));
                 log.info("Завершена сессия для пользователя chatId={}", chatId);
                 pomodoroManager.endSession(chatId);
@@ -181,14 +188,14 @@ public class PomodoroBot {
         pomodoroManager.saveFuture(chatId, future);
     }
 
-    private void onPhaseFinished(Long chatId) {
+    void onPhaseFinished(Long chatId) {
         PomodoroSession session = pomodoroManager.getSession(chatId);
         PomodoroServiceSettings settings = pomodoroManager.getSettings(chatId);
         StringBuilder builder = new StringBuilder();
 
         if (pomodoroManager.isOverLimit(session)) {
             log.info("Завершена сессия для пользователя chatId={}", chatId);
-            builder.append("Уважаемый пользователь, сессия превысила лимит времени существования и будет закрыта ⏳\uD83D\uDEAA");
+            builder.append(PomodoroMessages.LIMIT_IS_UP_MESSAGE);
             closingMessage(builder, chatId);
             pomodoroManager.cancelFuture(chatId);
 
@@ -208,8 +215,7 @@ public class PomodoroBot {
             pomodoroManager.endSession(chatId);
         } else if (!session.isWarnedAboutLimit() &&
                 pomodoroManager.isCloseToLimit(session, Duration.ofHours(2))) {
-            builder.append("Уважаемый пользователь, с момента первого запуска сессии прошло уже более 14 часов ⏰")
-                    .append("\nВ скором времени сессия будет закрыта по достижению лимита ⏳");
+            builder.append(PomodoroMessages.WARNED_LIMIT_MESSAGE);
             session.setWantedAboutLimit(true);
             sender.sendPomodoroReply(chatId, new PomodoroReply(builder.toString(), null, false));
         }
@@ -224,7 +230,7 @@ public class PomodoroBot {
                 session.setCurrentPhase(Phase.SHORT_BREAK);
                 session.startCurrentPhase(settings.shortRestDuration());
                 sender.sendPomodoroReply(chatId, new PomodoroReply(
-                        "Пора сделать короткий перерыв! \uD83E\uDDD8\u200D♂\uFE0F☕",
+                        PomodoroMessages.SHORT_REST_MESSAGE,
                         pomodoroManager.chooseMotivationForSession(session).pathToPhoto(),
                         false
                 ));
@@ -238,7 +244,7 @@ public class PomodoroBot {
                 session.setCurrentPhase(Phase.LONG_BREAK);
                 session.startCurrentPhase(settings.longRestDuration());
                 sender.sendPomodoroReply(chatId, new PomodoroReply(
-                        "Пора сделать длинный перерыв! \uD83C\uDF34☕",
+                        PomodoroMessages.LONG_REST_MESSAGE,
                         pomodoroManager.chooseMotivationForSession(session).pathToPhoto(),
                         false
                 ));
@@ -252,7 +258,7 @@ public class PomodoroBot {
                 session.setCurrentPhase(Phase.WORK);
                 session.startCurrentPhase(settings.workDuration());
                 sender.sendPomodoroReply(chatId, new PomodoroReply(
-                        "Перерыв окончен, поехали дальше! \uD83D\uDCAA",
+                        PomodoroMessages.END_REST_MESSAGE,
                         pomodoroManager.chooseMotivationForSession(session).pathToPhoto(),
                         false
                 ));
@@ -268,37 +274,33 @@ public class PomodoroBot {
         String textAnswer = "";
 
         if (!update.hasMessage() || !update.getMessage().hasText()) {
-            return new PomodoroReply("Кажется, что-то пошло не так \uD83E\uDD14\n" +
-                    "Пожалуйста, введите запрошенное значение.", null, true);
+            return new PomodoroReply(PomodoroMessages.WRONG_VALUE_MESSAGE, null, true);
         } else {
             textMessage = update.getMessage().getText().trim();
             try {
                 value = Integer.parseInt(textMessage);
             } catch (NumberFormatException e) {
-                return new PomodoroReply("Нужно ввести целое число, больше 0\uFE0F⃣ \uD83D\uDE42", null, true);
+                return new PomodoroReply(PomodoroMessages.WRONG_VALUE_NOT_INTEGER_MESSAGE, null, true);
             }
             if (value <= 0) {
-                return new PomodoroReply("Число должно быть больше 0, попробуйте ещё раз \uD83D\uDD01", null, true);
+                return new PomodoroReply(PomodoroMessages.WRONG_VALUE_NOT_POSITIVE_MESSAGE, null, true);
             }
         }
 
         if (state.getStep().equals(SetupStep.WAITING_WORK_DURATION)) {
             state.setWorkDuration(Duration.ofMinutes(value));
             state.setStep(SetupStep.WAITING_SHORT_REST_DURATION);
-            return new PomodoroReply("Период рабочего цикла определён ✅\n" +
-                    "Теперь отправьте период короткого отдыха в минутах ⏱\uFE0F",
+            return new PomodoroReply(PomodoroMessages.CREATE_WORK_MESSAGE,
                     null, true);
         } else if (state.getStep().equals(SetupStep.WAITING_SHORT_REST_DURATION)) {
             state.setShortRestDuration(Duration.ofMinutes(value));
             state.setStep(SetupStep.WAITING_LONG_REST_DURATION);
-            return new PomodoroReply("Период короткого отдыха определён ✅\n" +
-                    "Далее отправьте период длинного отдыха в минутах ⏱\uFE0F",
+            return new PomodoroReply(PomodoroMessages.CREATE_SHORT_REST_MESSAGE,
                     null, true);
         } else if (state.getStep().equals(SetupStep.WAITING_LONG_REST_DURATION)) {
             state.setLongRestDuration(Duration.ofMinutes(value));
             state.setStep(SetupStep.WAITING_COUNT_CYCLES);
-            return new PomodoroReply("Период длинного отдыха определён ✅\n" +
-                    "Теперь отправьте количество рабочих циклов до длинного отдыха \uD83D\uDD01",
+            return new PomodoroReply(PomodoroMessages.CREATE_LONG_REST_MESSAGE,
                     null, true);
         } else if (state.getStep().equals(SetupStep.WAITING_COUNT_CYCLES)) {
             state.setSessionsBeforeLongBreak(value);
@@ -309,7 +311,7 @@ public class PomodoroBot {
                     state.getShortRestDuration(),
                     state.getLongRestDuration(),
                     state.getSessionsBeforeLongBreak());
-            textAnswer = "Количество циклов работы до длинного отдыха определено, теперь можно начинать! \nОжидаю команду \"Старт \uD83D\uDE80\"!";
+            textAnswer = PomodoroMessages.ALL_PERIODS_CREATE_MESSAGE;
             pomodoroManager.setSettings(chatId, settings);
             pomodoroManager.addSession(
                     chatId,
@@ -325,20 +327,14 @@ public class PomodoroBot {
     public void closingMessage(StringBuilder builder, Long chatId) {
         PomodoroSession session = pomodoroManager.getSession(chatId);
         String rank = pomodoroManager.calculateRank(session);
-
-
-        builder.append("Сессия завершена. ✅")
-                .append("\nСовершено рабочих циклов: ")
-                .append(session.getCompleteWorkingCycles())
-                .append(" 💼")
-                .append("\nВам присваивается звание")
-                .append(" > ")
-                .append(rank)
-                .append("< ")
-                .append("\uD83C\uDFC5");
+        String rankMessage = String.format(
+                PomodoroMessages.CLOSING_MESSAGE_TEMPLATE,
+                pomodoroManager.getSession(chatId).getCompleteWorkingCycles(),
+                rank);
+        builder.append(rankMessage);
     }
 
-    private void logCurrentPhase(Long chatId, PomodoroServiceSettings settings) {
+    void logCurrentPhase(Long chatId, PomodoroServiceSettings settings) {
         Phase currentPhase = pomodoroManager.getSession(chatId).getCurrentPhase();
         Duration currentDuration = switch (currentPhase) {
             case WORK -> settings.workDuration();

@@ -1,20 +1,60 @@
-assets/movies/The_Godfather.png,Крёстный отец
-assets/movies/The_Shawshank_Redemption.png,Побег из Шоушенка
-assets/movies/The_Dark_Knight.png,Бэтмэн
-assets/movies/Pulp_Fiction.png,Криминальное чтиво
-assets/movies/Forrest_Gump.png,Форэст Гамп
-assets/movies/The_Matrix.png,Матрица
-assets/movies/Titanic.png,Титаник
-assets/movies/The_Lord_of_the_Rings_The_Fellowship_of_the_Ring.png,Властелин колец
-assets/movies/Star_Wars_Episode_IV_A_New_Hope.png,Звёздные войны
-assets/movies/Inception.png,Начало
-assets/movies/Fight_Club.png,Бойцовский клуб
-assets/movies/Back_to_the_Future.png,Назад в будущее
-assets/movies/The_Silence_of_the_Lambs.png,Молчание ягнят
-assets/movies/Saving_Private_Ryan.png,Спасение рядового Райана
-assets/movies/Jurassic_Park.png,Парк юрского периода
-assets/movies/Brat.png,Брат
-assets/movies/Brat_2.png,Брат 2
-assets/movies/Ironiya_sudby.png,Ирония судьбы или С лёгким паром!
-assets/movies/Moskva_slezam_ne_verit.png,Москва слезам не верит
-assets/movies/Lyubov_i_golubi.png,Любовь и голуби
+assets/movies/The_Godfather.jpg,Крёстный отец
+assets/movies/The_Shawshank_Redemption.jpg,Побег из Шоушенка
+assets/movies/The_Dark_Knight.jpg,Бэтмэн
+assets/movies/Pulp_Fiction.jpg,Криминальное чтиво
+assets/movies/Forrest_Gump.jpg,Форэст Гамп
+assets/movies/The_Matrix.jpg,Матрица
+assets/movies/Titanic.jpg,Титаник
+assets/movies/The_Lord_of_the_Rings_The_Fellowship_of_the_Ring.jpg,Властелин колец
+assets/movies/Star_Wars_Episode_IV_A_New_Hope.jpeg,Звёздные войны
+assets/movies/Inception.jpg,Начало
+assets/movies/Fight_Club.jpg,Бойцовский клуб
+assets/movies/Back_to_the_Future.jpg,Назад в будущее
+assets/movies/The_Silence_of_the_Lambs.jpg,Молчание ягнят
+assets/movies/Saving_Private_Ryan.jpg,Спасение рядового Райана
+assets/movies/Jurassic_Park.jpg,Парк юрского периода
+assets/movies/Brat.jpg,Брат
+assets/movies/Brat2.jpg,Брат 2
+assets/movies/Ironiya_sudby.jpg,Ирония судьбы или С лёгким паром!
+assets/movies/Moskva_slezam_ne_verit.jpg,Москва слезам не верит
+assets/movies/Lubov_i_golubi.jpg,Любовь и голуби
+assets/movies/Schindlers_List.jpg,Список Шиндлера
+assets/movies/Gladiator.jpg,Гладиатор
+assets/movies/Interstellar.jpg,Интерстеллар
+assets/movies/The_Green_Mile.jpg,Зелёная миля
+assets/movies/Leon.jpg,Леон
+assets/movies/The_Lion_King.jpg,Король Лев
+assets/movies/The_Terminator.jpg,Терминатор
+assets/movies/The_Dark_Knight_Rises.jpg,Тёмный рыцарь: Возрождение легенды
+assets/movies/Avengers_Endgame.jpg,Мстители: Финал
+assets/movies/The_Departed.jpg,Отступники
+assets/movies/The_Prestige.jpg,Престиж
+assets/movies/Inglourious_Basterds.jpg,Бесславные ублюдки
+assets/movies/The_Intouchables.jpg,1+1
+assets/movies/Catch_Me_If_You_Can.jpg,Поймай меня, если сможешь
+assets/movies/The_Wolf_of_Wall_Street.jpg,Волк с Уолл-стрит
+assets/movies/Toy_Story.jpg,История игрушек
+assets/movies/Finding_Nemo.jpg,В поисках Немо
+assets/movies/Up.jpg,Вверх
+assets/movies/Inside_Out.jpg,Головоломка
+assets/movies/Frozen.jpg,Холодное сердце
+assets/movies/Shrek.jpg,Шрэк
+assets/movies/Kung_Fu_Panda.jpg,Кунг-фу Панда
+assets/movies/Spirited_Away.jpeg,Унесённые призраками
+assets/movies/How_to_Train_Your_Dragon.jpg,Как приручить дракона
+assets/movies/Madagascar.jpg,Мадагаскар
+assets/movies/Zootopia.jpg,Зверополис
+assets/movies/Ratatouille.jpg,Рататуй
+assets/movies/The_Incredibles.jpg,Суперсемейка
+assets/movies/Ice_Age.jpg,Ледниковый период
+assets/movies/The_Grand_Budapest_Hotel.jpg,Отель «Гранд Будапешт»
+assets/movies/La_La_Land.jpg,Ла-Ла Ленд
+assets/movies/Whiplash.jpg,Одержимость
+assets/movies/The_Pianist.jpg,Пианист
+assets/movies/The_Usual_Suspects.jpg,Подозрительные лица
+assets/movies/Coco.jpg,Тайна Коко
+assets/movies/Moana.jpg,Моана
+assets/movies/Wall_E.jpg,ВАЛЛ-И
+assets/movies/Monsters_Inc.jpg,Корпорация монстров
+assets/movies/Big_Hero_6.jpg,Город героев
+assets/movies/The_Avatar.jpg,Аватар
