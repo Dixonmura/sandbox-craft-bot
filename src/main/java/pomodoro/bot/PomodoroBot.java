@@ -111,8 +111,11 @@ public class PomodoroBot {
         UserSetupState state = new UserSetupState();
         state.setStep(SetupStep.WAITING_WORK_DURATION);
         stateUsers.put(chatId, state);
+        var from = update.getMessage().getFrom();
+        String firstName = from != null ? from.getFirstName() : "unknown";
+        String userName = from != null ? from.getUserName() : "unknown";
 
-        log.info("Первый запуск Pomodoro-бота для пользователя chatId={}", chatId);
+        log.info("Первый запуск Pomodoro-бота для пользователя chatId={}, firstName={}, userName={}", chatId, firstName, userName);
 
         pomodoroManager.addSession(chatId, new PomodoroSession(
                 Phase.WORK,
@@ -128,6 +131,9 @@ public class PomodoroBot {
 
         Long chatId = update.getMessage().getChatId();
         StringBuilder builder = new StringBuilder();
+        var from = update.getMessage().getFrom();
+        String firstName = from != null ? from.getFirstName() : "unknown";
+        String userName = from != null ? from.getUserName() : "unknown";
 
         if (pomodoroManager.getSession(chatId).getState().equals(SessionState.SETUP)) {
             return checkUserSetupState(update, chatId);
@@ -164,14 +170,20 @@ public class PomodoroBot {
                 pomodoroManager.cancelFuture(chatId);
                 sender.sendPomodoroReply(chatId, new PomodoroReply(builder.toString(), null, true));
                 sender.sendFinalStatsQuestion(chatId, PomodoroMessages.QUESTION_STATS_MESSAGE);
-            } else if (textMessage.equalsIgnoreCase("Да 📊")) {
+            } else if (textMessage.equalsIgnoreCase(PomodoroMessages.YES_ANSWER_MESSAGE)) {
                 stats = csvStatsReader.readMonthlyStats(chatId);
-                sender.sendPomodoroReply(chatId, new PomodoroReply(statsUtils.getStatsMessage(stats), null, true));
-                log.info("Завершена сессия для пользователя chatId={}", chatId);
-                pomodoroManager.endSession(chatId);
+                if (stats.getWorkSessions() == 0) {
+                    sender.sendPomodoroReply(chatId, new PomodoroReply(PomodoroMessages.MESSAGE_WITHOUT_STATS, null, true));
+                    log.info("Завершена сессия для пользователя chatId={}, firstName={}, userName={}", chatId, firstName, userName);
+                    pomodoroManager.endSession(chatId);
+                } else {
+                    sender.sendPomodoroReply(chatId, new PomodoroReply(statsUtils.getStatsMessage(stats), null, true));
+                    log.info("Завершена сессия для пользователя chatId={}, firstName={}, userName={}", chatId, firstName, userName);
+                    pomodoroManager.endSession(chatId);
+                }
             } else if (textMessage.equalsIgnoreCase(PomodoroMessages.NO_ANSWER_MESSAGE)) {
-                sender.sendPomodoroReply(chatId, new PomodoroReply(statsUtils.getStatsMessage(stats), null, true));
-                log.info("Завершена сессия для пользователя chatId={}", chatId);
+                sender.sendPomodoroReply(chatId, new PomodoroReply(PomodoroMessages.END_MESSAGE_WITHOUT_STATS, null, true));
+                log.info("Завершена сессия для пользователя chatId={}, firstName={}, userName={}", chatId, firstName, userName);
                 pomodoroManager.endSession(chatId);
             }
 

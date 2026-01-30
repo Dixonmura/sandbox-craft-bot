@@ -37,6 +37,11 @@ public class CsvStatsReader implements StatsReader {
         stats.setRestSessions(0);
 
         Path file = baseDir.resolve("stats_" + chatId + ".csv");
+
+        if (!Files.exists(file)) {
+            return stats;
+        }
+
         List<RawEvent> rawEvents;
 
         try (InputStream inputStream = Files.newInputStream(file)) {

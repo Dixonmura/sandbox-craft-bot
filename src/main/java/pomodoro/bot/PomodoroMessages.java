@@ -2,6 +2,12 @@ package pomodoro.bot;
 
 public final class PomodoroMessages {
 
+    public static final String MESSAGE_WITHOUT_STATS = """
+            ⏰ Сессия завершена!\s
+            
+            📊 Статистика ещё не накопилась — она появится после первого рабочего цикла 🍅
+            Вернись и заверши его, тогда покажу крутой отчёт! 😊""";
+
     private PomodoroMessages() {
     }
 
@@ -36,6 +42,8 @@ public final class PomodoroMessages {
     public static final String QUESTION_STATS_MESSAGE = "📊 Хотите вывести статистику за последние 30 дней?";
 
     public static final String NO_ANSWER_MESSAGE = "Нет ❌";
+
+    public static final String YES_ANSWER_MESSAGE = "Да 📊";
 
     public static final String LIMIT_IS_UP_MESSAGE = "Уважаемый пользователь, сессия превысила лимит времени существования и будет закрыта ⏳\uD83D\uDEAA";
 
@@ -72,4 +80,7 @@ public final class PomodoroMessages {
             Сессия завершена. ✅
             Совершено рабочих циклов: %d 💼
             Вам присваивается звание: %s \uD83C\uDFC5""";
+
+
+    public static final String END_MESSAGE_WITHOUT_STATS = "✅ Сессия завершена! Отличная работа, возвращайся, когда будешь готов к новой \uD83D\uDE80";
 }

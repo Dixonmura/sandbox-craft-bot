@@ -122,7 +122,11 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
 
         if (!movieQuizBot.hasSession(chatId) && !pomodoroBot.hasSession(chatId)) {
 
-            log.info("Получено обычное сообщение без активной сессии, chatId={}", chatId);
+            var from = update.getMessage().getFrom();
+            String firstName = from != null ? from.getFirstName() : "unknown";
+            String userName = from != null ? from.getUserName() : "unknown";
+            log.info("Получено обычное сообщение без активной сессии, chatId={}, firstName={}, userName={}, text={}",
+                    chatId, firstName, userName, messageText);
 
             SendMessage message = SendMessage.builder()
                     .chatId(chatId)

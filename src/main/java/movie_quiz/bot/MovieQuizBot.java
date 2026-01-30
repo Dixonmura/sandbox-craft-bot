@@ -52,11 +52,14 @@ public class MovieQuizBot {
         Long chatId = update.getMessage().getChatId();
         GameManager manager = new GameManager(movies);
         sessions.put(chatId, manager);
+        var from = update.getMessage().getFrom();
+        String firstName = from != null ? from.getFirstName() : "unknown";
+        String userName = from != null ? from.getUserName() : "unknown";
 
         QuestionView movieTitles = manager.getNextQuestion().orElseThrow();
         Movie current = manager.getCurrentMovie();
 
-        log.info("Старт новой сессии MovieQuiz для chatId={}", chatId);
+        log.info("Старт новой сессии MovieQuiz для chatId={}, firstName={}, userName={}", chatId, firstName, userName);
 
         return new BotReply(MovieQuizMessages.GUESS_MOVIE,
                 movieTitles.movieTitles(),
@@ -72,9 +75,13 @@ public class MovieQuizBot {
         GameManager manager = sessions.get(chatId);
         StringBuilder builder = new StringBuilder();
         Message message = update.getMessage();
+        var from = update.getMessage().getFrom();
+        String firstName = from != null ? from.getFirstName() : "unknown";
+        String userName = from != null ? from.getUserName() : "unknown";
 
         if (manager == null) {
-            log.warn("Ответ без активной игровой сессии: manager is null, chatId={}", chatId);
+            log.warn("Ответ без активной игровой сессии: manager is null, chatId={}, firstName={}, userName={}",
+                    chatId, firstName, userName);
             builder.append(MovieQuizMessages.ANSWER_WITHOUT_SESSION);
             return new BotReply(builder.toString(),
                     List.of(),
@@ -87,7 +94,7 @@ public class MovieQuizBot {
             String rank = MovieQuizRank.fromScore(score);
             builder.append(String.format(MovieQuizMessages.ANSWER_END_GAME_WITH_RANK, score, rank));
             sessions.remove(chatId);
-            log.info("Завершение игровой сессии по желанию игрока, chatId={}", chatId);
+            log.info("Завершение игровой сессии по желанию игрока, chatId={}, firstName={}, userName={}", chatId, firstName, userName);
 
             return new BotReply(builder.toString(), List.of(), true, null);
         }
@@ -111,7 +118,7 @@ public class MovieQuizBot {
                     MovieQuizRank.fromScore(score)));
 
             sessions.remove(chatId);
-            log.info("Завершение игровой сессии по логике игры, chatId={}", chatId);
+            log.info("Завершение игровой сессии по логике игры, chatId={}, firstName={}, userName={}", chatId, firstName, userName);
 
             return new BotReply(builder.toString(), List.of(), true, null);
         } else {

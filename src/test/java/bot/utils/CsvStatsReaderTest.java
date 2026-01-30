@@ -67,14 +67,15 @@ class CsvStatsReaderTest {
     }
 
     @Test
-    @DisplayName("RuntimeException при ошибке чтения файла")
-    void throwsRuntimeException_whenFileNotFound() {
-        CsvStatsReader brokenReader =
+    @DisplayName("Возвращает пустую статистику при отсутствии файла")
+    void returnsEmptyStats_whenFileNotFound() {
+        CsvStatsReader readerNoFile =
                 new CsvStatsReader(Path.of("/definitely/no/such/dir"), clock, reader);
 
-        assertThatThrownBy(() -> brokenReader.readMonthlyStats(CHAT_ID))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessage("Ошибка чтения CSV");
-    }
+        PomodoroStats stats = readerNoFile.readMonthlyStats(CHAT_ID);
 
+        assertThat(stats.getWorkSessions()).isZero();
+        assertThat(stats.getWorkMinutes()).isZero();
+        assertThat(stats.getRestSessions()).isZero();
+    }
 }

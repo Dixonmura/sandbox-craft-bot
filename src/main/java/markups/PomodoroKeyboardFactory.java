@@ -3,6 +3,7 @@ package markups;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
+import pomodoro.bot.PomodoroMessages;
 
 import java.util.List;
 
@@ -23,9 +24,9 @@ public class PomodoroKeyboardFactory {
         KeyboardRow row1 = new KeyboardRow();
         KeyboardRow row2 = new KeyboardRow();
 
-        row1.add(new KeyboardButton("Старт \uD83D\uDE80"));
-        row1.add(new KeyboardButton("Пауза ⏸\uFE0F"));
-        row2.add(new KeyboardButton("Завершить сеанс ✅"));
+        row1.add(new KeyboardButton(PomodoroMessages.START_MESSAGE));
+        row1.add(new KeyboardButton(PomodoroMessages.PAUSE_MESSAGE));
+        row2.add(new KeyboardButton(PomodoroMessages.END_SEANCE_MESSAGE));
 
         List<KeyboardRow> rows = List.of(row1, row2);
 
@@ -37,8 +38,8 @@ public class PomodoroKeyboardFactory {
     }
 
     public ReplyKeyboardMarkup createFinalAskKeyboard() {
-        KeyboardButton yes = new KeyboardButton("Да 📊");
-        KeyboardButton no = new KeyboardButton("Нет ❌");
+        KeyboardButton yes = new KeyboardButton(PomodoroMessages.YES_ANSWER_MESSAGE);
+        KeyboardButton no = new KeyboardButton(PomodoroMessages.NO_ANSWER_MESSAGE);
 
         KeyboardRow row = new KeyboardRow();
         row.add(yes);
