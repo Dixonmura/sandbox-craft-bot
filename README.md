@@ -23,7 +23,7 @@
 Запустить приложение:
 
 bash
-java -jar sandbox-multi-bot-2.0.0.jar
+java -jar sandbox-multi-bot-2.0.1.jar
 
 ## Функциональность
 
