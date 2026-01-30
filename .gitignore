@@ -1,0 +1,25 @@
+cat > .gitignore << 'EOF'
+# Maven/Gradle
+target/
+build/
+*.jar
+*.class
+dependency-reduced-pom.xml
+
+# Logs
+logs/
+*.log
+
+# Tests/Coverage
+coverage/
+.nyc_output/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+EOF
