@@ -1,0 +1,53 @@
+package vacancy_tracker.core;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.time.ZoneOffset;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class UserTest {
+
+    @Test
+    @DisplayName("Проверка корректного создания экземпляра")
+    void constructor_shouldCreateUser_whenDataIsValid() {
+        User user = new User(11L);
+        assertThat(user)
+                .isNotNull();
+    }
+
+    @Test
+    @DisplayName("Проверка начальных значений и обновления полей класса")
+    void changeData_shouldCorrectlyChangedData() {
+        User user = new User(11L);
+
+        assertThat(user.getUserId()).isEqualTo(11L);
+        assertThat(user.getSettings()).isNull();
+        assertThat(user.getUtcOffset()).isNull();
+        assertThat(user.isSettingsReady()).isFalse();
+
+        user.updateUtcOffset(ZoneOffset.ofHours(3));
+        user.updateSettings(new UserSettings(
+                65,
+                8,
+                80000,
+                "Java",
+                Instant.parse("2025-03-18T03:00:00Z")));
+
+        assertThat(user.getSettings()).isNotNull();
+        assertThat(user.isSettingsReady()).isTrue();
+        assertThat(user.getUtcOffset()).isEqualTo(ZoneOffset.ofHours(3));
+    }
+
+    @Test
+    @DisplayName("Проверка выбрасывания, когда userId null")
+    void constructor_shouldThrowsException_whenUserIdNull() {
+        assertThatThrownBy(() ->
+                new User(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("userId не может быть null");
+    }
+}
