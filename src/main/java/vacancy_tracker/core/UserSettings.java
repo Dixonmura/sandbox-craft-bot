@@ -19,13 +19,14 @@ public class UserSettings {
 
     /**
      * Создает настройки пользователя с заданными параметрами.
-     * Все параметры могут быть null на этапе построения мастера настроек.
+     * Все параметры могут быть null кроме notificationTime.
      *
      * @param regionCode       код региона поиска вакансий
      * @param experienceFrom   минимальный опыт работы (в годах)
      * @param salaryFrom       минимальная ожидаемая заработная плата (в рублях)
      * @param wordForSearch    ключевое слово для поиска вакансий
      * @param notificationTime время будущих уведомлений в UTC
+     * @throws IllegalArgumentException если notificationTime null
      */
     public UserSettings(Integer regionCode, Integer experienceFrom, Integer salaryFrom, String wordForSearch, Instant notificationTime) {
         this.regionCode = regionCode;
@@ -33,7 +34,38 @@ public class UserSettings {
         this.salaryFrom = salaryFrom;
         this.wordForSearch = wordForSearch;
         this.notificationTime = notificationTime;
+
+        if (notificationTime == null) {
+            throw new IllegalArgumentException("NotificationTime не может быть null");
+        }
     }
 
-    //TODO дописать методы для обновления отдельных полей, а так же обязательную инициализацию notificationTime
+    public void updateRegionCode(int regionCode) {
+        this.regionCode = regionCode;
+    }
+
+    public void updateExperienceFrom(int experienceFrom) {
+        this.experienceFrom = experienceFrom;
+    }
+
+    public void updateSalaryFrom(int salaryFrom) {
+        this.salaryFrom = salaryFrom;
+    }
+
+    public void updateWordForSearch(String wordForSearch) {
+        this.wordForSearch = wordForSearch;
+    }
+
+    public void updateNotificationTime(Instant notificationTime) {
+        this.notificationTime = notificationTime;
+    }
+
+    /**
+     * Метод проверки установки времени нотификации.
+     *
+     * @return результат проверки установки нотификации
+     */
+    public boolean isNotificationScheduleReady() {
+        return notificationTime != null;
+    }
 }
