@@ -16,11 +16,11 @@ public class User {
     private ZoneOffset utcOffset;
 
     public User(Long userId) {
-        this.userId = userId;
 
         if (userId == null) {
             throw new IllegalArgumentException("userId не может быть null");
         }
+        this.userId = userId;
     }
 
     public void updateSettings(UserSettings userSettings) {
@@ -31,6 +31,10 @@ public class User {
         this.utcOffset = zoneOffset;
     }
 
+    public boolean hasUtcOffset() {
+        return utcOffset != null;
+    }
+
     /**
      * Проверяет, готов ли пользователь к запуску поиска вакансий.
      *
@@ -38,5 +42,9 @@ public class User {
      */
     public boolean isSettingsReady() {
         return settings != null && settings.isNotificationScheduleReady();
+    }
+
+    public boolean hasSettings() {
+        return settings != null;
     }
 }

@@ -25,8 +25,8 @@ class UserTest {
         User user = new User(11L);
 
         assertThat(user.getUserId()).isEqualTo(11L);
-        assertThat(user.getSettings()).isNull();
-        assertThat(user.getUtcOffset()).isNull();
+        assertThat(user.hasSettings()).isFalse();
+        assertThat(user.hasUtcOffset()).isFalse();
         assertThat(user.isSettingsReady()).isFalse();
 
         user.updateUtcOffset(ZoneOffset.ofHours(3));
@@ -37,8 +37,9 @@ class UserTest {
                 "Java",
                 Instant.parse("2025-03-18T03:00:00Z")));
 
-        assertThat(user.getSettings()).isNotNull();
+        assertThat(user.hasSettings()).isTrue();
         assertThat(user.isSettingsReady()).isTrue();
+        assertThat(user.hasUtcOffset()).isTrue();
         assertThat(user.getUtcOffset()).isEqualTo(ZoneOffset.ofHours(3));
     }
 
