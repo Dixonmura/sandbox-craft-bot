@@ -14,6 +14,7 @@ public class User {
     private final Long userId;
     private UserSettings settings;
     private ZoneOffset utcOffset;
+    private UserSettingState settingState = UserSettingState.NOT_INITIALIZED;
 
     public User(Long userId) {
 
@@ -29,6 +30,10 @@ public class User {
 
     public void updateUtcOffset(ZoneOffset zoneOffset) {
         this.utcOffset = zoneOffset;
+    }
+
+    public void updateSettingState(UserSettingState settingState) {
+        this.settingState = settingState;
     }
 
     public boolean hasUtcOffset() {

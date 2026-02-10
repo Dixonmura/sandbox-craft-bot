@@ -65,6 +65,7 @@ public class UserService {
         }
         User user = getOrCreateUser(userId);
         user.updateSettings(userSettings);
+        user.updateSettingState(UserSettingState.READY);
         repository.saveUser(user);
 
         return user;
