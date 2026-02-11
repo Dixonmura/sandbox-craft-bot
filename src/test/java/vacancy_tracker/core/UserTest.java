@@ -41,8 +41,10 @@ class UserTest {
 
         assertThat(user.hasSettings()).isTrue();
         assertThat(user.isSettingsReady()).isTrue();
+        assertThat(user.hasUtcOffset()).isTrue();
         assertThat(user.getUtcOffset()).isEqualTo(ZoneOffset.ofHours(3));
         assertThat(user.getSettingState()).isEqualTo(UserSettingState.READY);
+        assertThat(user.isSettingsReady()).isTrue();
     }
 
     @Test

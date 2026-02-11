@@ -86,7 +86,7 @@ class UserSettingsTest {
     }
 
     @Test
-    @DisplayName("Конструктор допускает null/минимальные значения, кроме notificationTime")
+    @DisplayName("Конструктор допускает null/минимальные значения")
     void constructor_shouldCreateUserSettings() {
         Instant instant = Instant.parse("2025-03-18T03:00:00Z");
         UserSettings userSettings = new UserSettings(
@@ -94,21 +94,24 @@ class UserSettingsTest {
                 null,
                 0,
                 "",
-                instant);
+                null);
 
         assertThat(userSettings).isNotNull();
+        assertThat(userSettings.isNotificationScheduleReady()).
+                isFalse();
     }
 
     @Test
-    @DisplayName("Проверка выбрасывания исключения, если notificationTime null")
-    void constructor_shouldThrowsIllegalArgumentException_whenNotificationTimeNull() {
+    @DisplayName("Проверка выбрасывания исключения, если updateNotificationTime = null")
+    void updateNotificationTime_shouldThrowsIllegalArgumentException_whenUpdateNotificationTimeNull() {
+        UserSettings userSettings = new UserSettings(
+                65,
+                null,
+                0,
+                "",
+                null);
         assertThatThrownBy(() ->
-                new UserSettings(
-                        65,
-                        null,
-                        0,
-                        "",
-                        null))
+                userSettings.updateNotificationTime(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("NotificationTime не может быть null");
     }

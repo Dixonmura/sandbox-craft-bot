@@ -34,10 +34,6 @@ public class UserSettings {
         this.salaryFrom = salaryFrom;
         this.wordForSearch = wordForSearch;
         this.notificationTime = notificationTime;
-
-        if (notificationTime == null) {
-            throw new IllegalArgumentException("NotificationTime не может быть null");
-        }
     }
 
     public void updateRegionCode(int regionCode) {
@@ -57,6 +53,9 @@ public class UserSettings {
     }
 
     public void updateNotificationTime(Instant notificationTime) {
+        if (notificationTime == null) {
+            throw new IllegalArgumentException("NotificationTime не может быть null");
+        }
         this.notificationTime = notificationTime;
     }
 
