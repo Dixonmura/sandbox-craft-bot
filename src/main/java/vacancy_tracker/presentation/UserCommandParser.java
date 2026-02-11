@@ -22,11 +22,14 @@ public class UserCommandParser {
     public UserCommandDto parse(IncomingUpdateDto dto) {
         String text = dto.text();
 
-        CommandType type;
-        String arguments = null;
+        if (text == null) {
+            return new UserCommandDto(dto.userId(), CommandType.UNKNOWN, null);
+        }
 
-        if (text != null && text.startsWith("/")) {
-            // тут разбор /start и т.п.
+        CommandType type;
+        String arguments = null; //пока без реализации
+
+        if (text.startsWith("/")) {
             type = CommandType.START; // пока заглушка
         } else {
             type = commandByButtonText.getOrDefault(text, CommandType.UNKNOWN);
