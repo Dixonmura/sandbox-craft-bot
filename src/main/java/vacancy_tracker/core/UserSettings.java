@@ -2,7 +2,7 @@ package vacancy_tracker.core;
 
 import lombok.Getter;
 
-import java.time.Instant;
+import java.time.LocalTime;
 
 /**
  * Настройки пользователя, для поиска вакансий.
@@ -15,7 +15,7 @@ public class UserSettings {
     private Integer experienceFrom;
     private Integer salaryFrom;
     private String wordForSearch;
-    private Instant notificationTime;
+    private LocalTime notificationTime;
 
     /**
      * Создает настройки пользователя с заданными параметрами.
@@ -25,10 +25,10 @@ public class UserSettings {
      * @param experienceFrom   минимальный опыт работы (в годах)
      * @param salaryFrom       минимальная ожидаемая заработная плата (в рублях)
      * @param wordForSearch    ключевое слово для поиска вакансий
-     * @param notificationTime время будущих уведомлений в UTC
+     * @param notificationTime время будущих уведомлений в LocalTime
      * @throws IllegalArgumentException если notificationTime null
      */
-    public UserSettings(Integer regionCode, Integer experienceFrom, Integer salaryFrom, String wordForSearch, Instant notificationTime) {
+    public UserSettings(Integer regionCode, Integer experienceFrom, Integer salaryFrom, String wordForSearch, LocalTime notificationTime) {
         this.regionCode = regionCode;
         this.experienceFrom = experienceFrom;
         this.salaryFrom = salaryFrom;
@@ -52,7 +52,7 @@ public class UserSettings {
         this.wordForSearch = wordForSearch;
     }
 
-    public void updateNotificationTime(Instant notificationTime) {
+    public void updateNotificationTime(LocalTime notificationTime) {
         if (notificationTime == null) {
             throw new IllegalArgumentException("NotificationTime не может быть null");
         }

@@ -5,7 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import vacancy_tracker.data.InMemoryUserRepository;
 
-import java.time.Instant;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +28,7 @@ class UserServiceTest {
     @Test
     @DisplayName("Проверка получения или создания User, если он не добавлен в репозиторий")
     void getOrCreateUser_shouldReturnUser_whenUserExistOrNotExist() {
-        userService.updateUtcOffset(USER_ID, "+03:00");
+        userService.updateUtcOffset(USER_ID, ZoneOffset.of("+03:00"));
         User createdUser = userService.getOrCreateUser(USER_ID);
         User notExistUser = userService.getOrCreateUser(98L);
 
@@ -45,7 +45,7 @@ class UserServiceTest {
     @Test
     @DisplayName("Проверка корректного сдвига часового пояса")
     void updateUtcOffset_shouldAcceptNewZoneOffset_whenDataIsValid() {
-        User user = userService.updateUtcOffset(USER_ID, "+07:00");
+        User user = userService.updateUtcOffset(USER_ID, ZoneOffset.of("+07:00"));
 
         assertThat(user)
                 .isNotNull()
@@ -58,10 +58,30 @@ class UserServiceTest {
     void updateUserSettings_shouldUpdateUserSettings_whenDataIsValid() {
         userService.updateUserSettings(
                 USER_ID,
-                new UserSettings(null, null, null, null, Instant.now()));
+                new UserSettings(null, null, null, null, LocalTime.now()));
 
         assertThat(userService.getOrCreateUser(USER_ID).hasSettings())
                 .isTrue();
+    }
+
+    @Test
+    @DisplayName("Проверка обновления отдельных полей настроек поиска вакансий")
+    void updateSomeSettings_shouldUpdateUserSettings_whenDataIsValid() {
+        userService.getOrCreateUser(USER_ID);
+        userService.updateUserSettings(
+                USER_ID,
+                new UserSettings(null, null, null, null, LocalTime.now()));
+        User region = userService.updateRegionCode(USER_ID, 65);
+        User salary = userService.updateSalaryFrom(USER_ID, 90000);
+        User experience = userService.updateExperienceFrom(USER_ID, 1);
+        User keyWord = userService.updateWordForSearch(USER_ID, "Kotlin");
+        User notificationTime = userService.updateNotificationTime(USER_ID, LocalTime.of(11, 55));
+
+        assertThat(region.getSettings().getRegionCode()).isEqualTo(65);
+        assertThat(salary.getSettings().getSalaryFrom()).isEqualTo(90000);
+        assertThat(experience.getSettings().getExperienceFrom()).isEqualTo(1);
+        assertThat(keyWord.getSettings().getWordForSearch()).contains("Kotlin");
+        assertThat(notificationTime.getSettings().getNotificationTime()).isEqualTo(LocalTime.of(11, 55));
     }
 
     @Test
@@ -73,7 +93,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Проверка выбрасывания исключения, userId null")
+    @DisplayName("Проверка выбрасывания исключения при получении или создании User, когда userId null")
     void getOrCreateUser_shouldThrowsIllegalArgumentException_whenUserIdIsNull() {
         assertThatThrownBy(() -> userService.getOrCreateUser(null))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -81,23 +101,26 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Проверка выбрасывания исключения при попытке обновить ZoneOffset с некорректными данными")
-    void updateUtcOffset_shouldThrowsIllegalArgumentException_whenUserIdIsNullOrZoneOffsetInvalid() {
-        assertThatThrownBy(() -> userService.updateUtcOffset(null, "+02:00"))
+    @DisplayName("Проверка выбрасывания исключения при попытке обновить какое-либо поле настроек, когда userId null")
+    void updateSomeSetting_shouldThrowsIllegalArgumentException_whenUserIdIsNull() {
+        assertThatThrownBy(() -> userService.updateUtcOffset(null, ZoneOffset.of("+02:00")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("userId не может быть null");
-
-        assertThatThrownBy(() -> userService.updateUtcOffset(USER_ID, null))
+        assertThatThrownBy(() -> userService.updateRegionCode(null, 65))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Неверный формат ввода зоны времени");
-
-        assertThatThrownBy(() -> userService.updateUtcOffset(USER_ID, ""))
+                .hasMessage("userId не может быть null");
+        assertThatThrownBy(() -> userService.updateSalaryFrom(null, 90000))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Ожидается: UTC+3, UTC+3:30, UTC-5");
-
-        assertThatThrownBy(() -> userService.updateUtcOffset(USER_ID, "-5:-25"))
+                .hasMessage("userId не может быть null");
+        assertThatThrownBy(() -> userService.updateExperienceFrom(null, 1))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Неверный формат ввода зоны времени UTC");
+                .hasMessage("userId не может быть null");
+        assertThatThrownBy(() -> userService.updateWordForSearch(null, "Kotlin"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("userId не может быть null");
+        assertThatThrownBy(() -> userService.updateNotificationTime(null, LocalTime.of(11, 55)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("userId не может быть null");
     }
 
     @Test
@@ -105,7 +128,7 @@ class UserServiceTest {
     void updateUserSettings_shouldThrowsIllegalArgumentException_whenUserIdOrUserSettingsIsNull() {
         assertThatThrownBy(() -> userService.updateUserSettings(
                 null,
-                new UserSettings(null, null, null, null, Instant.now())))
+                new UserSettings(null, null, null, null, LocalTime.now())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("userId не может быть null");
 

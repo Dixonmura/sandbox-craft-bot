@@ -3,24 +3,23 @@ package vacancy_tracker.core;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
+import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class UserSettingsTest {
 
-
     @Test
     @DisplayName("Проверка корректно заполненного конструктора")
     void constructor_shouldCreateNewUserSettings_whenDataIsValid() {
-        Instant instant = Instant.parse("2025-03-18T03:00:00Z");
+        LocalTime time = LocalTime.parse("07:00");
         UserSettings userSettings = new UserSettings(
                 65,
                 3,
                 80000,
                 "Java developer",
-                instant);
+                time);
 
         assertThat(userSettings.getRegionCode())
                 .isEqualTo(65);
@@ -35,19 +34,19 @@ class UserSettingsTest {
                 .contains("Java developer");
 
         assertThat(userSettings.getNotificationTime())
-                .isEqualTo(Instant.parse("2025-03-18T03:00:00Z"));
+                .isEqualTo(LocalTime.parse("07:00"));
     }
 
     @Test
     @DisplayName("Проверка поведения при обновлении данных полей класса")
     void updateDataUserSettings_shouldChangeFields_whenDataIsChanged() {
-        Instant instant = Instant.parse("2025-03-18T03:00:00Z");
+        LocalTime time = LocalTime.parse("07:00");
         UserSettings userSettings = new UserSettings(
                 65,
                 3,
                 80000,
                 "Java developer",
-                instant);
+                time);
 
         userSettings.updateExperienceFrom(5);
         assertThat(userSettings.getExperienceFrom())
@@ -65,21 +64,21 @@ class UserSettingsTest {
         assertThat(userSettings.getWordForSearch())
                 .contains("Junior Java");
 
-        userSettings.updateNotificationTime(Instant.parse("2025-03-18T07:00:00Z"));
+        userSettings.updateNotificationTime(LocalTime.parse("07:00"));
         assertThat(userSettings.getNotificationTime())
-                .isEqualTo(Instant.parse("2025-03-18T07:00:00Z"));
+                .isEqualTo(LocalTime.parse("07:00"));
     }
 
     @Test
     @DisplayName("Проверка создания экземпляра, когда notificationTime не null")
     void constructor_shouldCreateNewUserSettings_whenNotificationTimeNotNull() {
-        Instant instant = Instant.parse("2025-03-18T03:00:00Z");
+        LocalTime time = LocalTime.parse("07:00");
         UserSettings userSettings = new UserSettings(
                 65,
                 3,
                 80000,
                 "Java developer",
-                instant);
+                time);
 
         assertThat(userSettings.isNotificationScheduleReady())
                 .isTrue();
@@ -88,7 +87,6 @@ class UserSettingsTest {
     @Test
     @DisplayName("Конструктор допускает null/минимальные значения")
     void constructor_shouldCreateUserSettings() {
-        Instant instant = Instant.parse("2025-03-18T03:00:00Z");
         UserSettings userSettings = new UserSettings(
                 65,
                 null,

@@ -2,6 +2,7 @@ package vacancy_tracker.core;
 
 import lombok.Getter;
 
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 
 /**
@@ -26,6 +27,26 @@ public class User {
 
     public void updateSettings(UserSettings userSettings) {
         this.settings = userSettings;
+    }
+
+    public void updateRegionCode(int regionCode) {
+        settings.updateRegionCode(regionCode);
+    }
+
+    public void updateExperienceFrom(int experienceFrom) {
+        settings.updateExperienceFrom(experienceFrom);
+    }
+
+    public void updateSalaryFrom(int salaryFrom) {
+        settings.updateSalaryFrom(salaryFrom);
+    }
+
+    public void updateWordForSearch(String wordForSearch) {
+        settings.updateWordForSearch(wordForSearch);
+    }
+
+    public void updateNotificationTime(LocalTime notificationTime) {
+        settings.updateNotificationTime(notificationTime);
     }
 
     public void updateUtcOffset(ZoneOffset zoneOffset) {

@@ -1,5 +1,6 @@
 package vacancy_tracker.core;
 
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 
 /**
@@ -20,6 +21,7 @@ public class UserService {
     /**
      * Возвращает существующего пользователя по userId
      * или создаёт нового, если он ещё не сохранён в репозитории.
+     * Бросает IllegalArgumentException, если userId null.
      */
     public User getOrCreateUser(Long userId) {
         if (userId == null) {
@@ -37,17 +39,14 @@ public class UserService {
     /**
      * Обновляет смещение часового пояса пользователя по строке формата,
      * поддерживаемом ZoneOffset (например, "+03:00" или "-05:30").
-     * При некорректном формате бросает IllegalArgumentException.
+     * Бросает IllegalArgumentException, если userId null.
      */
-    public User updateUtcOffset(Long userId, String zoneUtcOffset) {
+    public User updateUtcOffset(Long userId, ZoneOffset zoneUtcOffset) {
         if (userId == null) {
             throw new IllegalArgumentException("userId не может быть null");
         }
-        if (zoneUtcOffset == null || zoneUtcOffset.trim().isEmpty()) {
-            throw new IllegalArgumentException("Неверный формат ввода зоны времени UTC. Ожидается: UTC+3, UTC+3:30, UTC-5");
-        }
         User user = getOrCreateUser(userId);
-        user.updateUtcOffset(parseUtcOffset(zoneUtcOffset));
+        user.updateUtcOffset(zoneUtcOffset);
         repository.saveUser(user);
         return user;
     }
@@ -55,6 +54,7 @@ public class UserService {
     /**
      * Обновляет настройки (фильтры) пользователя для поиска вакансий.
      * Если пользователь с таким userId не найден, будет создан новый.
+     * Бросает IllegalArgumentException, если userId или userSettings null.
      */
     public User updateUserSettings(Long userId, UserSettings userSettings) {
         if (userId == null) {
@@ -71,11 +71,78 @@ public class UserService {
         return user;
     }
 
-    private ZoneOffset parseUtcOffset(String zoneOffset) {
-        try {
-            return ZoneOffset.of(zoneOffset);
-        } catch (RuntimeException e) {
-            throw new IllegalArgumentException("Неверный формат ввода зоны времени UTC");
+    /**
+     * Обновляет регион пользователя для поиска вакансий.
+     * Если пользователь с таким userId не найден, будет создан новый.
+     * Бросает IllegalArgumentException, если userId null.
+     */
+    public User updateRegionCode(Long userId, int regionCode) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
         }
+        User user = getOrCreateUser(userId);
+        user.updateRegionCode(regionCode);
+        repository.saveUser(user);
+        return user;
+    }
+
+    /**
+     * Обновляет минимальный опыт пользователя для поиска вакансий.
+     * Если пользователь с таким userId не найден, будет создан новый.
+     * Бросает IllegalArgumentException, если userId null.
+     */
+    public User updateExperienceFrom(Long userId, int experienceFrom) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        User user = getOrCreateUser(userId);
+        user.updateExperienceFrom(experienceFrom);
+        repository.saveUser(user);
+        return user;
+    }
+
+    /**
+     * Обновляет минимальную ожидаемую зарплату пользователя для поиска вакансий.
+     * Если пользователь с таким userId не найден, будет создан новый.
+     * Бросает IllegalArgumentException, если userId null.
+     */
+    public User updateSalaryFrom(Long userId, int salaryFrom) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        User user = getOrCreateUser(userId);
+        user.updateSalaryFrom(salaryFrom);
+        repository.saveUser(user);
+        return user;
+    }
+
+    /**
+     * Обновляет ключевое слово пользователя для поиска вакансий.
+     * Если пользователь с таким userId не найден, будет создан новый.
+     * Бросает IllegalArgumentException, если userId null.
+     */
+    public User updateWordForSearch(Long userId, String wordForSearch) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        User user = getOrCreateUser(userId);
+        user.updateWordForSearch(wordForSearch);
+        repository.saveUser(user);
+        return user;
+    }
+
+    /**
+     * Обновляет время нотификации пользователя для поиска вакансий.
+     * Если пользователь с таким userId не найден, будет создан новый.
+     * Бросает IllegalArgumentException, если userId null.
+     */
+    public User updateNotificationTime(Long userId, LocalTime notificationTime) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        User user = getOrCreateUser(userId);
+        user.updateNotificationTime(notificationTime);
+        repository.saveUser(user);
+        return user;
     }
 }
