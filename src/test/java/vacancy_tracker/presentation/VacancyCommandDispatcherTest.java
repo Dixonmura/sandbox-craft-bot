@@ -152,6 +152,23 @@ class VacancyCommandDispatcherTest {
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
+                new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, ""));
+        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
+                .containsExactly(USER_ID, """
+                                Введите время нотификации (это обязательное поле).
+                                Например: 13:35 или 18 55""",
+                        VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
+        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_NOTIFY_TIME)).isTrue();
+
+        reply = dispatcher.commandDispatch(
+                new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, "17 55"));
+        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
+                .containsExactly(USER_ID, """
+                                Время нотификации для ежедневного оповещения обновлёно""",
+                        VacancyKeyboardKey.SETTING_KEYBOARD);
+        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
+
+        reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.READY, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
                 .containsExactly(USER_ID, """

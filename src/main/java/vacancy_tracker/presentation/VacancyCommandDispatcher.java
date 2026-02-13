@@ -169,7 +169,7 @@ public class VacancyCommandDispatcher {
                             VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
                 } else {
                     try {
-                        LocalTime time = LocalTime.parse(arguments);
+                        LocalTime time = parseNotificationTime(arguments);
                         userService.updateNotificationTime(userId, time);
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
                         return new VacancyReply(userId, """
@@ -244,6 +244,20 @@ public class VacancyCommandDispatcher {
             }
             default -> throw new IllegalStateException("Неизвестная ошибка при обработке типа команды" + type);
         }
+    }
+
+    private LocalTime parseNotificationTime(String input) {
+        String trimmed = input.trim();
+        if (trimmed.contains(":")) {
+            return LocalTime.parse(trimmed);
+        }
+        String[] parts = trimmed.split("\\s+");
+        if (parts.length == 2) {
+            int hour = Integer.parseInt(parts[0]);
+            int minute = Integer.parseInt(parts[1]);
+            return LocalTime.of(hour, minute);
+        }
+        throw new IllegalArgumentException("Неверный формат времени");
     }
 
     private boolean checkCurrentState(Long userId) {
