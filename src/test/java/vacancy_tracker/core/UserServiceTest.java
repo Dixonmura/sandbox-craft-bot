@@ -121,6 +121,12 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.updateNotificationTime(null, LocalTime.of(11, 55)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("userId не может быть null");
+        assertThatThrownBy(() -> userService.updateSettingState(null, UserSettingState.WAITING_SET_KEYWORD))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("userId не может быть null");
+        assertThatThrownBy(() -> userService.getSettingState(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("userId не может быть null");
     }
 
     @Test

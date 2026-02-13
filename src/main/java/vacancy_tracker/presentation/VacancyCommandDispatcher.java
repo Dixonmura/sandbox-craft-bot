@@ -1,7 +1,9 @@
 package vacancy_tracker.presentation;
 
+import markups.VacancyKeyboardKey;
 import vacancy_tracker.bot.VacancyReply;
 import vacancy_tracker.core.UserService;
+import vacancy_tracker.core.UserSettingState;
 import vacancy_tracker.presentation.dto.CommandType;
 import vacancy_tracker.presentation.dto.UserCommandDto;
 
@@ -50,204 +52,201 @@ public class VacancyCommandDispatcher {
         switch (type) {
             case START -> {
                 userService.getOrCreateUser(userId);
-
-                //TODO добавить к выводу актуальную для текущего этапа клавиатуру
-
+                userService.updateSettingState(userId, UserSettingState.CLEAN);
                 return new VacancyReply(userId, """
                         Vacancy tracker bot приветствует Вас!
-                        Для удобства, в боте будет использоваться часовой пояс UTC""");
+                        Для удобства, в боте будет использоваться часовой пояс UTC""",
+                        VacancyKeyboardKey.SETTING_KEYBOARD);
             }
             case SET_UTC -> {
-                if (arguments == null || arguments.isBlank()) {
-
-                    //TODO установить состояние ожидания для текущего типа команды и убрать клавиатуру
-
+                if (checkCurrentState(userId)) {
+                    userService.updateSettingState(userId, UserSettingState.WAITING_SET_UTC);
                     return new VacancyReply(userId, """
                             Введите смещение часового пояса в формате UTC.
-                            Вот пример: +07:00 или -11:30"""); // убрали клавиатуру
+                            Вот пример: +07:00 или -11:30""", VacancyKeyboardKey.UTC_KEYBOARD);
                 } else {
                     try {
                         ZoneOffset zone = ZoneOffset.of(arguments);
                         userService.updateUtcOffset(userId, zone);
-
-                        //TODO добавить к выводу актуальную для текущего этапа клавиатуру очистить состояние
-
+                        userService.updateSettingState(userId, UserSettingState.CLEAN);
                         return new VacancyReply(userId, """
-                                Смещение часового пояса для пользователя обновлено""");
+                                Смещение часового пояса для пользователя обновлено""",
+                                VacancyKeyboardKey.SETTING_KEYBOARD);
                     } catch (RuntimeException e) {
                         return new VacancyReply(userId, """
-                                Неверный формат ввода зоны времени UTC. Ожидается: UTC+3, UTC+3:30, UTC-5""");
+                                Неверный формат ввода зоны времени UTC. Ожидается: UTC+3, UTC+3:30, UTC-5""",
+                                VacancyKeyboardKey.UTC_KEYBOARD);
                     }
                 }
             }
             case SET_REGION -> {
-                if (arguments == null || arguments.isBlank()) {
-
-                    //TODO установить состояние ожидания для текущего типа команды и убрать клавиатуру
-
+                if (checkCurrentState(userId)) {
+                    userService.updateSettingState(userId, UserSettingState.WAITING_SET_REGION);
                     return new VacancyReply(userId, """
-                            Выберите регион из списка или введите номер региона в виде целого числа"""); // убрали клавиатуру
+                            Выберите регион из списка или введите номер региона в виде целого числа""",
+                            VacancyKeyboardKey.REGION_KEYBOARD);
                 } else {
                     try {
                         int regionCode = Integer.parseInt(arguments);
                         userService.updateRegionCode(userId, regionCode);
-
-                        //TODO добавить к выводу актуальную для текущего этапа клавиатуру, очистить состояние
-
+                        userService.updateSettingState(userId, UserSettingState.CLEAN);
                         return new VacancyReply(userId, """
-                                Регион для поиска вакансий обновлён""");
+                                Регион для поиска вакансий обновлён""",
+                                VacancyKeyboardKey.SETTING_KEYBOARD);
                     } catch (NumberFormatException e) {
                         return new VacancyReply(userId, """
-                                Неверный формат ввода региона, введите целое число, например: 65, 77, 05""");
+                                Неверный формат ввода региона, введите целое число, например: 65, 77, 05""",
+                                VacancyKeyboardKey.REGION_KEYBOARD);
                     }
                 }
             }
             case SET_MIN_EXPERIENCE -> {
-                if (arguments == null || arguments.isBlank()) {
-
-                    //TODO установить состояние ожидания для текущего типа команды и убрать клавиатуру
-
+                if (checkCurrentState(userId)) {
+                    userService.updateSettingState(userId, UserSettingState.WAITING_SET_MIN_EXPERIENCE);
                     return new VacancyReply(userId, """
                             Введите минимальный опыт работы в виде целого числа (лет).
-                            Например: 5"""); // убрали клавиатуру
+                            Например: 5""",
+                            VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
                 } else {
                     try {
                         int experienceFrom = Integer.parseInt(arguments);
                         userService.updateExperienceFrom(userId, experienceFrom);
-
-                        //TODO добавить к выводу актуальную для текущего этапа клавиатуру, очистить состояние
-
+                        userService.updateSettingState(userId, UserSettingState.CLEAN);
                         return new VacancyReply(userId, """
-                                Минимальный опыт работы для поиска вакансий обновлён""");
+                                Минимальный опыт работы для поиска вакансий обновлён""",
+                                VacancyKeyboardKey.SETTING_KEYBOARD);
                     } catch (NumberFormatException e) {
                         return new VacancyReply(userId, """
-                                Неверный формат ввода минимального опыта работы, ожидается например: 1, 3, 5""");
+                                Неверный формат ввода минимального опыта работы, ожидается например: 1, 3, 5""",
+                                VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
                     }
                 }
             }
             case SET_MIN_SALARY -> {
-                if (arguments == null || arguments.isBlank()) {
-
-                    //TODO установить состояние ожидания для текущего типа команды и убрать клавиатуру
-
+                if (checkCurrentState(userId)) {
+                    userService.updateSettingState(userId, UserSettingState.WAITING_SET_MIN_SALARY);
                     return new VacancyReply(userId, """
                             Введите минимальную ожидаемую заработную плату в виде целого числа.
-                            Например: 70000""");
+                            Например: 70000""",
+                            VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
                 } else {
                     try {
                         int minSalary = Integer.parseInt(arguments);
                         userService.updateSalaryFrom(userId, minSalary);
-
-                        //TODO добавить к выводу актуальную для текущего этапа клавиатуру, очистить состояние
-
+                        userService.updateSettingState(userId, UserSettingState.CLEAN);
                         return new VacancyReply(userId, """
-                                Минимальная ожидаемая зарплата для поиска вакансий обновлёна""");
+                                Минимальная ожидаемая зарплата для поиска вакансий обновлёна""",
+                                VacancyKeyboardKey.SETTING_KEYBOARD);
                     } catch (NumberFormatException e) {
                         return new VacancyReply(userId, """
                                 Неверный формат ввода минимальной заработной платы,
-                                ожидается например: 70000 или 90000""");
+                                ожидается например: 70000 или 90000""",
+                                VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
                     }
                 }
             }
             case SET_KEYWORD -> {
-                if (arguments == null || arguments.isBlank()) {
-
-                    //TODO установить состояние ожидания для текущего типа команды и убрать клавиатуру
-
+                if (checkCurrentState(userId)) {
+                    userService.updateSettingState(userId, UserSettingState.WAITING_SET_KEYWORD);
                     return new VacancyReply(userId, """
                             Введите ключевое слово для поиска соответствующих вакансий.
-                            Например: Java Developer""");
+                            Например: Java Developer""",
+                            VacancyKeyboardKey.NONE);
                 } else {
                     userService.updateWordForSearch(userId, arguments);
-
-                    //TODO добавить к выводу актуальную для текущего этапа клавиатуру, очистить состояние
-
+                    userService.updateSettingState(userId, UserSettingState.CLEAN);
                     return new VacancyReply(userId, """
-                            Ключевое слово для поиска соответствующих вакансий обновлёно""");
+                            Ключевое слово для поиска соответствующих вакансий обновлёно""",
+                            VacancyKeyboardKey.SETTING_KEYBOARD);
                 }
             }
             case SET_NOTIFY_TIME -> {
-                if (arguments == null || arguments.isBlank()) {
-
-                    //TODO установить состояние ожидания для текущего типа команды и убрать клавиатуру
-
+                if (checkCurrentState(userId)) {
+                    userService.updateSettingState(userId, UserSettingState.WAITING_SET_NOTIFY_TIME);
                     return new VacancyReply(userId, """
                             Введите время нотификации (это обязательное поле).
-                            Например: 13:35 или 18 55""");
+                            Например: 13:35 или 18 55""",
+                            VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
                 } else {
                     try {
                         LocalTime time = LocalTime.parse(arguments);
                         userService.updateNotificationTime(userId, time);
-
-                        //TODO добавить парсер формата для LocalTime
-                        //TODO добавить к выводу актуальную для текущего этапа клавиатуру, очистить состояние
-
+                        userService.updateSettingState(userId, UserSettingState.CLEAN);
                         return new VacancyReply(userId, """
-                                Время нотификации для ежедневного оповещения обновлёно""");
+                                Время нотификации для ежедневного оповещения обновлёно""",
+                                VacancyKeyboardKey.SETTING_KEYBOARD);
                     } catch (RuntimeException e) {
                         return new VacancyReply(userId, """
                                 неверный формат времени нотификации,
-                                ожидается например: 17:00 или 02 33""");
+                                ожидается например: 17:00 или 02 33""",
+                                VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
                     }
                 }
             }
             case READY -> {
-                if (arguments == null || arguments.isBlank()) {
-                    //TODO проверяем готовность в UserService
-                    //TODO установить состояние ожидания для текущего типа команды и показать клавиатуру для старта
-
+                if (checkCurrentState(userId)) {
+                    userService.updateSettingState(userId, UserSettingState.WAITING_READY_COMMAND);
                     return new VacancyReply(userId, """
                             Настройки завершены, для старта планировщика уведомлений нажмите кнопку "Начать"
-                            """);
+                            или вернитесь в меню настроек.
+                            """,
+                            VacancyKeyboardKey.READY_KEYBOARD);
                 } else {
-                    if (arguments.equals("Начать")) {
-                        //TODO очищаем состояние ожидания типа команды и запускаем планировщик
+                    if ("Начать".equals(arguments)) {
+                        userService.updateSettingState(userId, UserSettingState.CLEAN);
                         return new VacancyReply(userId, """
-                                Планировщик запущен! Удачного поиска и до встречи! =)""");
+                                Планировщик запущен! Удачного поиска и до встречи! =)""",
+                                VacancyKeyboardKey.STOP_KEYBOARD);
+                    } else if ("Вернуться".equals(arguments)) {
+                        userService.updateSettingState(userId, UserSettingState.CLEAN);
+                        return new VacancyReply(userId, """
+                                Возврат в главное меню настроек.""",
+                                VacancyKeyboardKey.SETTING_KEYBOARD);
+                    } else {
+                        return new VacancyReply(userId, """
+                                Похоже был введён некорректный ответ, для старта нажмите "Начать"
+                                """,
+                                VacancyKeyboardKey.READY_KEYBOARD);
                     }
-                    return new VacancyReply(userId, """
-                            Похоже был введён некорректный ответ, для старта нажмите "Начать"
-                            """);
                 }
             }
             case STOP -> {
-                if (arguments == null || arguments.isBlank()) {
-
-                    //TODO установить состояние ожидания для текущего типа команды и показать клавиатуру с вариантами "Да" и "Нет"
-
+                if (checkCurrentState(userId)) {
+                    userService.updateSettingState(userId, UserSettingState.WAITING_STOP_COMMAND);
                     return new VacancyReply(userId, """
                             Вы уверены, что хотите остановить работу бота и удалить данные поиска? Введите: Да или Нет
-                            """);
+                            """,
+                            VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
                 } else {
-                    switch (arguments) {
-                        case "Да" -> {
-
-                            //TODO убираем клавиатуру
-
-                            return new VacancyReply(userId, """
-                                    Планирование завершено, все данные удалены, было приятно работать!
-                                    Надеемся было полезно и продуктивно! Возвращайтесь! =)""");
-                        }
-                        case "Нет" -> {
-
-                            //TODO добавить к выводу актуальную для текущего этапа клавиатуру и UserService.appropriateCommand
-
-                            return new VacancyReply(userId, """
-                                    Благодарим, что продолжаете пользоваться VacancyTrackerBot =)""");
-                        }
-                        default -> {
-                            return new VacancyReply(userId, """
-                                    Похоже был введён некорректный ответ, выберите ответ на клавиатуре
-                                    или напишите самостоятельно: Да или Нет""");
-                        }
+                    if ("Да".equals(arguments)) {
+                        userService.updateSettingState(userId, UserSettingState.CLEAN);
+                        return new VacancyReply(userId, """
+                                Планирование завершено, все данные удалены, было приятно работать!
+                                Надеемся было полезно и продуктивно! Возвращайтесь! =)""",
+                                VacancyKeyboardKey.START_KEYBOARD);
+                    } else if ("Нет".equals(arguments)) {
+                        userService.updateSettingState(userId, UserSettingState.CLEAN);
+                        return new VacancyReply(userId, """
+                                Благодарим, что продолжаете пользоваться VacancyTrackerBot =)""",
+                                VacancyKeyboardKey.STOP_KEYBOARD);
+                    } else {
+                        return new VacancyReply(userId, """
+                                Похоже был введён некорректный ответ, выберите ответ на клавиатуре
+                                или напишите самостоятельно: Да или Нет""",
+                                VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
                     }
                 }
             }
             case UNKNOWN -> {
                 return new VacancyReply(userId, """
-                        Неизвестная команда, попробуйте воспользоваться клавиатурой или напечатать команду корректно.""");
+                        Неизвестная команда, попробуйте воспользоваться клавиатурой выше или напечатать команду корректно.""",
+                        VacancyKeyboardKey.NONE);
             }
             default -> throw new IllegalStateException("Неизвестная ошибка при обработке типа команды" + type);
         }
+    }
+
+    private boolean checkCurrentState(Long userId) {
+        return userService.getSettingState(userId) == UserSettingState.CLEAN;
     }
 }

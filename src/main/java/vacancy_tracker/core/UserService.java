@@ -145,4 +145,35 @@ public class UserService {
         repository.saveUser(user);
         return user;
     }
+
+    /**
+     * Обновляет состояние пользователя для поиска вакансий.
+     * Если пользователь с таким userId не найден, будет создан новый.
+     * Бросает IllegalArgumentException, если userId null.
+     */
+    public User updateSettingState(Long userId, UserSettingState newState) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        if (newState == null) {
+            throw new IllegalArgumentException("newState не может быть null");
+        }
+        User user = getOrCreateUser(userId);
+        user.updateSettingState(newState);
+        repository.saveUser(user);
+        return user;
+    }
+
+    /**
+     * Читает текущее состояние пользователя для поиска вакансий.
+     * Если пользователь с таким userId не найден, будет создан новый.
+     * Бросает IllegalArgumentException, если userId null.
+     */
+    public UserSettingState getSettingState(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        User user = getOrCreateUser(userId);
+        return user.getSettingState();
+    }
 }
