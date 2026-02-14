@@ -4,32 +4,38 @@ import markups.VacancyKeyboardKey;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import vacancy_tracker.bot.VacancyReply;
-import vacancy_tracker.core.UserRepository;
-import vacancy_tracker.core.UserService;
-import vacancy_tracker.core.UserSettingState;
-import vacancy_tracker.core.UserSettings;
+import vacancy_tracker.core.*;
 import vacancy_tracker.data.InMemoryUserRepository;
 import vacancy_tracker.presentation.dto.CommandType;
 import vacancy_tracker.presentation.dto.UserCommandDto;
 
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class VacancyCommandDispatcherTest {
 
     Long USER_ID = 18L;
     UserRepository repository;
     UserService userService;
     VacancyCommandDispatcher dispatcher;
+    @Mock
+    ScheduledNotificationService notificationService;
 
     @BeforeEach
     void setUp() {
         repository = new InMemoryUserRepository();
         userService = new UserService(repository);
-        dispatcher = new VacancyCommandDispatcher(userService);
+        dispatcher = new VacancyCommandDispatcher(userService, notificationService);
         userService.updateUserSettings(USER_ID, new UserSettings(
                 65,
                 3,
@@ -241,6 +247,31 @@ class VacancyCommandDispatcherTest {
     }
 
     @Test
+    @DisplayName("Проверка запуска планировщика и отмены задачи при соответствующей команде")
+    void checkNotificationService_shouldRunOrCloseTask_whenCallStartOrStop() {
+        userService.updateUtcOffset(USER_ID, ZoneOffset.ofHours(5));
+        dispatcher.commandDispatch(
+                new UserCommandDto(USER_ID, CommandType.START, ""));
+        dispatcher.commandDispatch(
+                new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, ""));
+        dispatcher.commandDispatch(
+                new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, "18:00"));
+        dispatcher.commandDispatch(
+                new UserCommandDto(USER_ID, CommandType.READY, ""));
+        dispatcher.commandDispatch(
+                new UserCommandDto(USER_ID, CommandType.READY, "Начать"));
+        verify(notificationService, times(1)).scheduleNotifications(any(User.class));
+
+        dispatcher.commandDispatch(
+                new UserCommandDto(USER_ID, CommandType.STOP, ""));
+        dispatcher.commandDispatch(
+                new UserCommandDto(USER_ID, CommandType.STOP, "Да"));
+        verify(notificationService, times(1)).cancelNotifications(USER_ID);
+
+        verifyNoMoreInteractions(notificationService);
+    }
+
+    @Test
     @DisplayName("Проверка диспетчера на некорректные команды")
     void commandDispatch_shouldReturnUnknownTypeMessage_whenCommandTypeIsUnknown() {
 
@@ -332,9 +363,14 @@ class VacancyCommandDispatcherTest {
     @DisplayName("Проверка выброса исключения при создании экземпляра, когда userService null")
     void constructor_shouldThrowsIllegalArgumentException_whenUserServiceIsNull() {
         assertThatThrownBy(() ->
-                new VacancyCommandDispatcher(null))
+                new VacancyCommandDispatcher(null, notificationService))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("userService не может быть null");
+
+        assertThatThrownBy(() ->
+                new VacancyCommandDispatcher(userService, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("notificationService не может быть null");
     }
 
     @Test

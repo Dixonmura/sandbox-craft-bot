@@ -2,6 +2,8 @@ package vacancy_tracker.presentation;
 
 import markups.VacancyKeyboardKey;
 import vacancy_tracker.bot.VacancyReply;
+import vacancy_tracker.core.ScheduledNotificationService;
+import vacancy_tracker.core.User;
 import vacancy_tracker.core.UserService;
 import vacancy_tracker.core.UserSettingState;
 import vacancy_tracker.presentation.dto.CommandType;
@@ -25,12 +27,17 @@ import java.time.ZoneOffset;
 public class VacancyCommandDispatcher {
 
     private final UserService userService;
+    private final ScheduledNotificationService notificationService;
 
-    public VacancyCommandDispatcher(UserService userService) {
+    public VacancyCommandDispatcher(UserService userService, ScheduledNotificationService notificationService) {
         if (userService == null) {
             throw new IllegalArgumentException("userService не может быть null");
         }
+        if (notificationService == null) {
+            throw new IllegalArgumentException("notificationService не может быть null");
+        }
         this.userService = userService;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -193,6 +200,8 @@ public class VacancyCommandDispatcher {
                             VacancyKeyboardKey.READY_KEYBOARD);
                 } else {
                     if ("Начать".equals(arguments)) {
+                        User user = userService.getOrCreateUser(userId);
+                        notificationService.scheduleNotifications(user);
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
                         return new VacancyReply(userId, """
                                 Планировщик запущен! Удачного поиска и до встречи! =)""",
@@ -219,6 +228,7 @@ public class VacancyCommandDispatcher {
                             VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
                 } else {
                     if ("Да".equals(arguments)) {
+                        notificationService.cancelNotifications(userId);
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
                         return new VacancyReply(userId, """
                                 Планирование завершено, все данные удалены, было приятно работать!
