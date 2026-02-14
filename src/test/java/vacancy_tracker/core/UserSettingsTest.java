@@ -85,7 +85,7 @@ class UserSettingsTest {
     }
 
     @Test
-    @DisplayName("Конструктор допускает null/минимальные значения")
+    @DisplayName("Конструктор допускает null/минимальные значения и корректно обновляет поля класса")
     void constructor_shouldCreateUserSettings() {
         UserSettings userSettings = new UserSettings(
                 65,
@@ -97,6 +97,9 @@ class UserSettingsTest {
         assertThat(userSettings).isNotNull();
         assertThat(userSettings.isNotificationScheduleReady()).
                 isFalse();
+
+        userSettings.updateExperienceFrom(3);
+        assertThat(userSettings.getExperienceFrom()).isEqualTo(3);
     }
 
     @Test

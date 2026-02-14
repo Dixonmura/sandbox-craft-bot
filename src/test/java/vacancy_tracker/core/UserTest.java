@@ -28,7 +28,7 @@ class UserTest {
     }
 
     @Test
-    @DisplayName("Проверка начальных значений и обновления полей класса")
+    @DisplayName("Проверка начальных значений UserSettings и обновления полей класса")
     void changeData_shouldCorrectlyChangedData() {
         assertThat(user.getUserId()).isEqualTo(USER_ID);
         assertThat(user.hasSettings()).isFalse();
@@ -48,7 +48,7 @@ class UserTest {
         user.updateSalaryFrom(80000);
         user.updateWordForSearch("C++");
         user.updateUtcOffset(ZoneOffset.of("+02:20"));
-        user.updateNotificationTime(LocalTime.of(3,15));
+        user.updateNotificationTime(LocalTime.of(3, 15));
         user.updateSettingState(UserSettingState.READY);
 
         assertThat(user.hasSettings()).isTrue();
@@ -57,26 +57,45 @@ class UserTest {
         assertThat(user.getUtcOffset()).isEqualTo(ZoneOffset.of("+02:20"));
         assertThat(user.getSettingState()).isEqualTo(UserSettingState.READY);
         assertThat(user.getSettings().getWordForSearch()).contains("C++");
-        assertThat(user.getSettings().getNotificationTime()).isEqualTo(LocalTime.of(3,15));
+        assertThat(user.getSettings().getNotificationTime()).isEqualTo(LocalTime.of(3, 15));
     }
 
     @Test
     @DisplayName("Проверка инициализации UserSetting и установленных в этом классе значений")
     void updateUserSettings_shouldCorrectlyInitializedAndApplyValues_whenValuesIsValid() {
+
+        assertThat(user.hasSettings()).isFalse();
+
         user.updateSettings(new UserSettings(
-                80,
-                8,
-                80000,
-                "Java",
-                LocalTime.parse("03:15")));
+                null, null, null, null, null));
         user.updateSettingState(UserSettingState.READY);
 
+        assertThat(user.isSettingsReady()).isFalse();
+
+        user.updateSalaryFrom(95000);
+        assertThat(user.getSettings().getSalaryFrom()).isEqualTo(95000);
         assertThat(user.hasSettings()).isTrue();
+
+        user.updateWordForSearch("Java");
+        user.updateNotificationTime(LocalTime.of(3, 15));
+
         assertThat(user.isSettingsReady()).isTrue();
         assertThat(user.getSettingState()).isEqualTo(UserSettingState.READY);
         assertThat(user.getSettings().getWordForSearch()).contains("Java");
-        assertThat(user.getSettings().getNotificationTime()).isEqualTo(LocalTime.of(3,15));
+        assertThat(user.getSettings().getNotificationTime()).isEqualTo(LocalTime.of(3, 15));
     }
+
+    @Test
+    @DisplayName("При вызове updateSalaryFrom без явного updateSettings настройки инициализируются лениво")
+    void updateSalaryFrom_shouldInitSettingsLazily() {
+        assertThat(user.hasSettings()).isFalse();
+
+        user.updateSalaryFrom(50000);
+
+        assertThat(user.hasSettings()).isTrue();
+        assertThat(user.getSettings().getSalaryFrom()).isEqualTo(50000);
+    }
+
 
     @Test
     @DisplayName("Проверка выбрасывания, когда userId null")

@@ -26,26 +26,35 @@ public class User {
     }
 
     public void updateSettings(UserSettings userSettings) {
-        this.settings = userSettings;
+        if (userSettings == null) {
+            ensureSettings();
+        } else {
+            this.settings = userSettings;
+        }
     }
 
     public void updateRegionCode(int regionCode) {
+        ensureSettings();
         settings.updateRegionCode(regionCode);
     }
 
     public void updateExperienceFrom(int experienceFrom) {
+        ensureSettings();
         settings.updateExperienceFrom(experienceFrom);
     }
 
     public void updateSalaryFrom(int salaryFrom) {
+        ensureSettings();
         settings.updateSalaryFrom(salaryFrom);
     }
 
     public void updateWordForSearch(String wordForSearch) {
+        ensureSettings();
         settings.updateWordForSearch(wordForSearch);
     }
 
     public void updateNotificationTime(LocalTime notificationTime) {
+        ensureSettings();
         settings.updateNotificationTime(notificationTime);
     }
 
@@ -55,6 +64,14 @@ public class User {
 
     public void updateSettingState(UserSettingState settingState) {
         this.settingState = settingState;
+    }
+
+    private void ensureSettings() {
+        if (settings == null) {
+            settings = new UserSettings(
+                    null, null, null, null, null
+            );
+        }
     }
 
     public boolean hasUtcOffset() {

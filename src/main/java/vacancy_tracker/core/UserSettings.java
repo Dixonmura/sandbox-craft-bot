@@ -19,14 +19,13 @@ public class UserSettings {
 
     /**
      * Создает настройки пользователя с заданными параметрами.
-     * Все параметры могут быть null кроме notificationTime.
+     * Все параметры могут быть null.
      *
      * @param regionCode       код региона поиска вакансий
      * @param experienceFrom   минимальный опыт работы (в годах)
      * @param salaryFrom       минимальная ожидаемая заработная плата (в рублях)
      * @param wordForSearch    ключевое слово для поиска вакансий
      * @param notificationTime время будущих уведомлений в LocalTime
-     * @throws IllegalArgumentException если notificationTime null
      */
     public UserSettings(Integer regionCode, Integer experienceFrom, Integer salaryFrom, String wordForSearch, LocalTime notificationTime) {
         this.regionCode = regionCode;
