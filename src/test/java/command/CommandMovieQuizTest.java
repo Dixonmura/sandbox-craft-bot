@@ -42,7 +42,7 @@ class CommandMovieQuizTest {
     @Test
     @DisplayName("Проверка отправки сообщения при корректной команде /playMovieQuiz")
     void execute_shouldSendQuestionMessage_whenCommandIsCorrect() throws TelegramApiException {
-        // given
+
         Update update = getUpdate();
         BotReply reply = new BotReply(
                 "Угадай фильм по кадру",
@@ -52,10 +52,8 @@ class CommandMovieQuizTest {
         );
         when(movieQuizBot.startGame(update)).thenReturn(reply);
 
-        // when
         commandMovieQuiz.execute(update);
 
-        // then: проверяем только текстовое сообщение
         ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
         verify(telegramClient).execute(captor.capture());
 

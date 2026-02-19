@@ -1,6 +1,7 @@
 package bot;
 
 import command.CommandDispatcher;
+import markups.VacancyKeyboardKey;
 import movie_quiz.bot.BotReply;
 import movie_quiz.bot.MovieQuizBot;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,7 +9,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatcher;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -19,9 +19,12 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import pomodoro.bot.PomodoroBot;
 import pomodoro.bot.PomodoroReply;
+import vacancy_tracker.bot.VacancyBot;
+import vacancy_tracker.bot.VacancyReply;
 
 import java.util.List;
 
+import static bot.RouterMessages.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -38,12 +41,14 @@ class BotRouterTest {
     MovieQuizBot movieQuizBot;
     @Mock
     PomodoroBot pomodoroBot;
+    @Mock
+    VacancyBot vacancyBot;
 
     private BotRouter botRouter;
 
     @BeforeEach
     void setUp() {
-        botRouter = new BotRouter(telegramClient, commandDispatcher, movieQuizBot, pomodoroBot);
+        botRouter = new BotRouter(telegramClient, commandDispatcher, movieQuizBot, pomodoroBot, vacancyBot);
     }
 
     @Test
@@ -55,7 +60,6 @@ class BotRouterTest {
 
         verify(commandDispatcher).dispatch("/playmoviequiz", update);
         verifyNoMoreInteractions(commandDispatcher);
-        verifyNoInteractions(telegramClient);
     }
 
     @Test
@@ -70,7 +74,7 @@ class BotRouterTest {
 
         verify(telegramClient).execute(argThat((SendMessage msg) ->
                 msg.getChatId().equals(String.valueOf(CHAT_ID)) &&
-                        msg.getText().contains("Сейчас я понимаю только команды")));
+                        msg.getText().contains(COMMAND_UNDERSTAND_MESSAGE)));
     }
 
     @Test
@@ -85,7 +89,6 @@ class BotRouterTest {
         );
 
         when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(true);
-        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(false);
         when(movieQuizBot.handleAnswer(update)).thenReturn(reply);
 
         botRouter.consume(update);
@@ -93,6 +96,41 @@ class BotRouterTest {
         verify(movieQuizBot).handleAnswer(update);
         verify(telegramClient).execute(any(SendMessage.class));
     }
+
+    @Test
+    @DisplayName("при состоянии CONFIGURING сообщение обрабатывает VacancyBot.handleAnswer")
+    void consume_shouldCallVacancyBotHandleAnswer_whenVacancyBotIsConfiguring() throws Exception {
+        Update update = createUpdateWithText(CHAT_ID, "ответ");
+        VacancyReply reply = new VacancyReply(CHAT_ID, "Текст", VacancyKeyboardKey.SETTING_KEYBOARD);
+
+        when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
+        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(false);
+        when(vacancyBot.isConfiguring(CHAT_ID)).thenReturn(true);
+        when(vacancyBot.handleAnswer(update)).thenReturn(reply);
+
+        botRouter.consume(update);
+
+        verify(vacancyBot).handleAnswer(update);
+        verify(telegramClient).execute(any(SendMessage.class));
+    }
+
+
+    @Test
+    @DisplayName("при состоянии ACTIVE отправляется системное сообщение о запущенном планировщике")
+    void consume_shouldSendPlannerActiveMessage_whenVacancyBotIsActive() throws Exception {
+        Update update = createUpdateWithText(CHAT_ID, "ответ");
+
+        when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
+        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(false);
+        when(vacancyBot.isConfiguring(CHAT_ID)).thenReturn(false);
+        when(vacancyBot.isActive(CHAT_ID)).thenReturn(true);
+
+        botRouter.consume(update);
+
+        verify(vacancyBot, never()).handleAnswer(update);
+        verify(telegramClient).execute(any(SendMessage.class));
+    }
+
 
     @Test
     @DisplayName("сообщение при активной Pomodoro-сессии уходит в PomodoroBot")
@@ -124,14 +162,13 @@ class BotRouterTest {
     @DisplayName("Проверка отработки условия невозможности запуска двух ботов одновременно")
     void createAnyBot_shouldCreateOnlyOneBot_whenUserCallOtherBot() throws TelegramApiException {
         when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(true);
-        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(false);
         botRouter.consume(createUpdateWithText(CHAT_ID, "/startpomodoro"));
 
         ArgumentMatcher<SendMessage> twoBotsWarning = msg ->
                 msg != null
                         && CHAT_ID.toString().equals(msg.getChatId())
                         && msg.getText() != null
-                        && msg.getText().contains("❌ Нельзя одновременно запускать два бота.");
+                        && msg.getText().contains(QUIZ_IS_ACTIVE);
 
         verify(telegramClient, atLeastOnce())
                 .execute(argThat(twoBotsWarning));
@@ -141,14 +178,15 @@ class BotRouterTest {
     @DisplayName("Проверка отработки условия невозможности запуска двух ботов одновременно")
     void createAnyBot_shouldCreateOnlyOneBot_whenPomodoroBotSessionIsExist() throws TelegramApiException {
         when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
-        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(true);
+        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(false);
+        when(vacancyBot.isConfiguring(CHAT_ID)).thenReturn(true);
         botRouter.consume(createUpdateWithText(CHAT_ID, "/playmoviequiz"));
 
         ArgumentMatcher<SendMessage> twoBotsWarning = msg ->
                 msg != null
                         && CHAT_ID.toString().equals(msg.getChatId())
                         && msg.getText() != null
-                        && msg.getText().contains("У вас уже запущен бот Pomodoro.");
+                        && msg.getText().contains(VACANCY_IS_CONFIGURE);
 
         verify(telegramClient, atLeastOnce())
                 .execute(argThat(twoBotsWarning));
@@ -202,7 +240,6 @@ class BotRouterTest {
         Update update = createUpdateWithText(CHAT_ID, "ответ");
         BotReply reply = new BotReply("text", List.of("1", "2", "3", "4"), false, ".img");
 
-        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(false);
         when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(true);
         when(movieQuizBot.handleAnswer(update)).thenReturn(reply);
 

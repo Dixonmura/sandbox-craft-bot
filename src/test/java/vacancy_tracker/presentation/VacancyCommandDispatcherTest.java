@@ -8,6 +8,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import vacancy_tracker.bot.VacancyReply;
+import vacancy_tracker.bot.types.NavigationAction;
+import vacancy_tracker.bot.types.ReadyAction;
+import vacancy_tracker.bot.types.StartBotOption;
 import vacancy_tracker.core.*;
 import vacancy_tracker.data.InMemoryUserRepository;
 import vacancy_tracker.presentation.dto.CommandType;
@@ -20,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static vacancy_tracker.bot.VacancyMessages.*;
 
 @ExtendWith(MockitoExtension.class)
 class VacancyCommandDispatcherTest {
@@ -48,201 +52,141 @@ class VacancyCommandDispatcherTest {
     @DisplayName("Проверка диспетчера на возвращение соответствующего команде ответа")
     void commandDispatch_shouldReturnAppropriateAnswer_whenDataIsValid() {
         VacancyReply reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.START, "Старт"));
+                new UserCommandDto(USER_ID, CommandType.START, StartBotOption.START_BOT.getTitle()));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Vacancy tracker bot приветствует Вас!
-                                Для удобства, в боте будет использоваться часовой пояс UTC""",
-                        VacancyKeyboardKey.SETTING_KEYBOARD);
+                .containsExactly(USER_ID, AFTER_START_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_UTC, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Введите смещение часового пояса в формате UTC.
-                                Вот пример: +07:00 или -11:30""",
-                        VacancyKeyboardKey.UTC_KEYBOARD);
+                .containsExactly(USER_ID, ENTER_UTC_OFFSET, VacancyKeyboardKey.UTC_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_UTC)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_UTC, "+05:30"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Смещение часового пояса для пользователя обновлено""",
-                        VacancyKeyboardKey.SETTING_KEYBOARD);
+                .containsExactly(USER_ID, UPDATED_UTC_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_REGION, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Выберите регион из списка или введите номер региона в виде целого числа""",
-                        VacancyKeyboardKey.REGION_KEYBOARD);
+                .containsExactly(USER_ID, REGION_MESSAGE, VacancyKeyboardKey.REGION_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_REGION)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_REGION, "65"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Регион для поиска вакансий обновлён""",
-                        VacancyKeyboardKey.SETTING_KEYBOARD);
+                .containsExactly(USER_ID, UPDATE_REGION_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_MIN_EXPERIENCE, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Введите минимальный опыт работы в виде целого числа (лет).
-                                Например: 5""",
-                        VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
+                .containsExactly(USER_ID, EXPERIENCE_MESSAGE, VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_MIN_EXPERIENCE)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_MIN_EXPERIENCE, "3"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Минимальный опыт работы для поиска вакансий обновлён""",
-                        VacancyKeyboardKey.SETTING_KEYBOARD);
+                .containsExactly(USER_ID, UPDATE_EXPERIENCE_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_MIN_SALARY, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Введите минимальную ожидаемую заработную плату в виде целого числа.
-                                Например: 70000""",
-                        VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
+                .containsExactly(USER_ID, SALARY_MESSAGE, VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_MIN_SALARY)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_MIN_SALARY, "90000"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Минимальная ожидаемая зарплата для поиска вакансий обновлёна""",
-                        VacancyKeyboardKey.SETTING_KEYBOARD);
+                .containsExactly(USER_ID, UPDATE_SALARY_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_KEYWORD, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Введите ключевое слово для поиска соответствующих вакансий.
-                                Например: Java Developer""",
-                        VacancyKeyboardKey.NONE);
+                .containsExactly(USER_ID, KEYWORD_MESSAGE, VacancyKeyboardKey.NONE);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_KEYWORD)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_KEYWORD, "Java Developer"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Ключевое слово для поиска соответствующих вакансий обновлёно""",
-                        VacancyKeyboardKey.SETTING_KEYBOARD);
+                .containsExactly(USER_ID, UPDATE_KEYWORD_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Введите время нотификации (это обязательное поле).
-                                Например: 13:35 или 18 55""",
-                        VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
+                .containsExactly(USER_ID, NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_NOTIFY_TIME)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, "03:00"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Время нотификации для ежедневного оповещения обновлёно""",
-                        VacancyKeyboardKey.SETTING_KEYBOARD);
+                .containsExactly(USER_ID, UPDATE_NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Введите время нотификации (это обязательное поле).
-                                Например: 13:35 или 18 55""",
-                        VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
+                .containsExactly(USER_ID, NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_NOTIFY_TIME)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, "17 55"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Время нотификации для ежедневного оповещения обновлёно""",
-                        VacancyKeyboardKey.SETTING_KEYBOARD);
+                .containsExactly(USER_ID, UPDATE_NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.READY, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Настройки завершены, для старта планировщика уведомлений нажмите кнопку "Начать"
-                                или вернитесь в меню настроек.
-                                """,
-                        VacancyKeyboardKey.READY_KEYBOARD);
+                .containsExactly(USER_ID, READY_MESSAGE, VacancyKeyboardKey.READY_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_READY_COMMAND)).isTrue();
 
         reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.READY, "Начать"));
+                new UserCommandDto(USER_ID, CommandType.READY, ReadyAction.COMPLETE.getTitle()));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Планировщик запущен! Удачного поиска и до встречи! =)""",
-                        VacancyKeyboardKey.STOP_KEYBOARD);
+                .containsExactly(USER_ID, READY_START_MESSAGE, VacancyKeyboardKey.STOP_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.READY, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Настройки завершены, для старта планировщика уведомлений нажмите кнопку "Начать"
-                                или вернитесь в меню настроек.
-                                """,
-                        VacancyKeyboardKey.READY_KEYBOARD);
+                .containsExactly(USER_ID, READY_MESSAGE, VacancyKeyboardKey.READY_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_READY_COMMAND)).isTrue();
 
         reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.READY, "Вернуться"));
+                new UserCommandDto(USER_ID, CommandType.READY, NavigationAction.RETURN.getTitle()));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Возврат в главное меню настроек.""",
-                        VacancyKeyboardKey.SETTING_KEYBOARD);
+                .containsExactly(USER_ID, BACK_INTO_SETTINGS_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.STOP, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Вы уверены, что хотите остановить работу бота и удалить данные поиска? Введите: Да или Нет
-                                """,
-                        VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
+                .containsExactly(USER_ID, STOP_MESSAGE, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_STOP_COMMAND)).isTrue();
 
         reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.STOP, "Да"));
+                new UserCommandDto(USER_ID, CommandType.STOP, ReadyAction.YES.getTitle()));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Планирование завершено, все данные удалены, было приятно работать!
-                                Надеемся было полезно и продуктивно! Возвращайтесь! =)""",
-                        VacancyKeyboardKey.START_KEYBOARD);
+                .containsExactly(USER_ID, SUCCESSFUL_STOP_MESSAGE, VacancyKeyboardKey.START_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
 
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.STOP, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Вы уверены, что хотите остановить работу бота и удалить данные поиска? Введите: Да или Нет
-                                """,
-                        VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
+                .containsExactly(USER_ID, STOP_MESSAGE, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_STOP_COMMAND)).isTrue();
 
         reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.STOP, "Нет"));
+                new UserCommandDto(USER_ID, CommandType.STOP, ReadyAction.NO.getTitle()));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Благодарим, что продолжаете пользоваться VacancyTrackerBot =)""",
-                        VacancyKeyboardKey.STOP_KEYBOARD);
+                .containsExactly(USER_ID, CONTINUE_MESSAGE, VacancyKeyboardKey.STOP_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
     }
 
@@ -259,13 +203,13 @@ class VacancyCommandDispatcherTest {
         dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.READY, ""));
         dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.READY, "Начать"));
+                new UserCommandDto(USER_ID, CommandType.READY, ReadyAction.COMPLETE.getTitle()));
         verify(notificationService, times(1)).scheduleNotifications(any(User.class));
 
         dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.STOP, ""));
         dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.STOP, "Да"));
+                new UserCommandDto(USER_ID, CommandType.STOP, ReadyAction.YES.getTitle()));
         verify(notificationService, times(1)).cancelNotifications(USER_ID);
 
         verifyNoMoreInteractions(notificationService);
@@ -280,9 +224,7 @@ class VacancyCommandDispatcherTest {
         VacancyReply reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_UTC, "27:46"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Неверный формат ввода зоны времени UTC. Ожидается: UTC+3, UTC+3:30, UTC-5""",
-                        VacancyKeyboardKey.UTC_KEYBOARD);
+                .containsExactly(USER_ID, ERROR_UTC_MESSAGE, VacancyKeyboardKey.UTC_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_UTC)).isTrue();
 
         dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
@@ -290,9 +232,7 @@ class VacancyCommandDispatcherTest {
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_REGION, "Сахалин"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Неверный формат ввода региона, введите целое число, например: 65, 77, 05""",
-                        VacancyKeyboardKey.REGION_KEYBOARD);
+                .containsExactly(USER_ID, ERROR_REGION_MESSAGE, VacancyKeyboardKey.REGION_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_REGION)).isTrue();
 
         dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
@@ -300,9 +240,7 @@ class VacancyCommandDispatcherTest {
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_MIN_EXPERIENCE, "Минимум"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Неверный формат ввода минимального опыта работы, ожидается например: 1, 3, 5""",
-                        VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
+                .containsExactly(USER_ID, ERROR_EXPERIENCE_MESSAGE, VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_MIN_EXPERIENCE)).isTrue();
 
         dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
@@ -310,10 +248,7 @@ class VacancyCommandDispatcherTest {
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_MIN_SALARY, "Много"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Неверный формат ввода минимальной заработной платы,
-                                ожидается например: 70000 или 90000""",
-                        VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
+                .containsExactly(USER_ID, ERROR_SALARY_MESSAGE, VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_MIN_SALARY)).isTrue();
 
         dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
@@ -321,10 +256,7 @@ class VacancyCommandDispatcherTest {
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, "Где-то в обед"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                неверный формат времени нотификации,
-                                ожидается например: 17:00 или 02 33""",
-                        VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
+                .containsExactly(USER_ID, ERROR_NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_NOTIFY_TIME)).isTrue();
 
         dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
@@ -332,10 +264,7 @@ class VacancyCommandDispatcherTest {
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.READY, "Ну поехали"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Похоже был введён некорректный ответ, для старта нажмите "Начать"
-                                """,
-                        VacancyKeyboardKey.READY_KEYBOARD);
+                .containsExactly(USER_ID, ERROR_READY_MESSAGE, VacancyKeyboardKey.READY_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_READY_COMMAND)).isTrue();
 
         dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
@@ -343,19 +272,14 @@ class VacancyCommandDispatcherTest {
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.STOP, "Сам не знаю"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Похоже был введён некорректный ответ, выберите ответ на клавиатуре
-                                или напишите самостоятельно: Да или Нет""",
-                        VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
+                .containsExactly(USER_ID, ERROR_STOP_MESSAGE, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_STOP_COMMAND)).isTrue();
 
         dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.UNKNOWN, "Привет бот"));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, """
-                                Неизвестная команда, попробуйте воспользоваться клавиатурой выше или напечатать команду корректно.""",
-                        VacancyKeyboardKey.NONE);
+                .containsExactly(USER_ID, UNKNOWN_MESSAGE, VacancyKeyboardKey.NONE);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
     }
 

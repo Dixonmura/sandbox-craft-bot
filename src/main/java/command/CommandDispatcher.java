@@ -6,6 +6,7 @@ import org.apache.logging.log4j.Logger;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import pomodoro.bot.PomodoroBot;
+import vacancy_tracker.bot.VacancyBot;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -26,11 +27,17 @@ public class CommandDispatcher {
      * @param telegramClient клиент Telegram для отправки ответов
      * @param quizBot        экземпляр квиз-бота для игровых команд
      * @param pomodoroBot    экземпляр помодоро бота
+     * @param vacancyBot     экземпляр бота вакансий
      */
-    public CommandDispatcher(TelegramClient telegramClient, MovieQuizBot quizBot, PomodoroBot pomodoroBot) {
+    public CommandDispatcher(
+            TelegramClient telegramClient,
+            MovieQuizBot quizBot,
+            PomodoroBot pomodoroBot,
+            VacancyBot vacancyBot) {
         commandMap.put("/start", new CommandStart(telegramClient));
         commandMap.put("/playmoviequiz", new CommandMovieQuiz(telegramClient, quizBot));
         commandMap.put("/startpomodoro", new CommandPomodoro(telegramClient, pomodoroBot));
+        commandMap.put("/startvacancybot", new CommandVacancy(telegramClient, vacancyBot));
     }
 
     /**

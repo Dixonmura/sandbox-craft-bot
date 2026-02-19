@@ -2,6 +2,8 @@ package bot.utils;
 
 import markups.MovieQuizKeyboardFactory;
 import markups.PomodoroKeyboardFactory;
+import markups.VacancyKeyboardKey;
+import markups.VacancyTrackerKeyboardFactory;
 import movie_quiz.bot.BotReply;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -10,6 +12,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import pomodoro.bot.PomodoroReply;
+import vacancy_tracker.bot.VacancyReply;
 
 import java.io.InputStream;
 
@@ -23,6 +26,7 @@ public class ReplyUtils {
 
     private static final MovieQuizKeyboardFactory keyboardFactoryQuiz = new MovieQuizKeyboardFactory();
     private static final PomodoroKeyboardFactory keyboardFactoryPomodoro = new PomodoroKeyboardFactory();
+    private static final VacancyTrackerKeyboardFactory keyboardFactoryVacancyTracker = new VacancyTrackerKeyboardFactory();
     private static final Logger log = LogManager.getLogger(ReplyUtils.class);
 
     /**
@@ -198,5 +202,50 @@ public class ReplyUtils {
                 .text(reply.text())
                 .replyMarkup(keyboardFactoryPomodoro.createButtonsKeyboard())
                 .build();
+    }
+
+    /**
+     * Создаёт объект {@link SendMessage} на основе {@link VacancyReply}.
+     * <p>
+     * В качестве текста используется {@link VacancyReply#text()}, а идентификатор чата берётся из {@link VacancyReply#userId()}.
+     * Если {@link VacancyReply#keyboardKey()} не равен {@code null} и не равен {@link VacancyKeyboardKey#NONE},
+     * к сообщению добавляется соответствующая клавиатура из {@link VacancyTrackerKeyboardFactory}.
+     * Иначе сообщение отправляется без клавиатуры.
+     *
+     * @param reply доменный ответ бота с текстом и типом клавиатуры
+     * @return настроенный {@link SendMessage} или {@code null}, если reply равен {@code null}
+     */
+    public static SendMessage sendMessageVacancy(VacancyReply reply) {
+        if (reply == null) {
+            log.error("sendMessage вызван, когда VacancyReply null");
+            return null;
+        }
+
+        SendMessage.SendMessageBuilder builder = SendMessage.builder()
+                .chatId(reply.userId())
+                .text(reply.text());
+
+        VacancyKeyboardKey key = reply.keyboardKey();
+        if (key == null || key == VacancyKeyboardKey.NONE) {
+            return builder.build();
+        }
+
+        switch (key) {
+            case START_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createStartKeyboard());
+            case UTC_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createUtcOffsetsKeyboard(0));
+            case REGION_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createRegionKeyboard(0));
+            case MIN_EXPERIENCE_KEYBOARD ->
+                    builder.replyMarkup(keyboardFactoryVacancyTracker.createExperienceKeyboard());
+            case MIN_SALARY_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createSalaryKeyboard());
+            case KEY_WORD_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createKeyWordKeyboard());
+            case NOTIFY_TIME_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createNotifyTimeKeyboard(0));
+            case YES_OR_NO_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createYesOrNoKeyboard());
+            case READY_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createReadyKeyboard());
+            case STOP_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createStopKeyboard());
+            case SETTING_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createSettingKeyboard());
+        }
+
+        log.info("Отправка Vacancy сообщения в чат chatId={}", reply.userId());
+        return builder.build();
     }
 }

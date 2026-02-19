@@ -15,6 +15,7 @@ import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import pomodoro.bot.PomodoroBot;
+import vacancy_tracker.bot.VacancyBot;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,12 +29,13 @@ class CommandDispatcherTest {
     TelegramClient telegramClient;
     MovieQuizBot movieQuizBot;
     PomodoroBot pomodoroBot;
+    VacancyBot vacancyBot;
     CommandDispatcher commandDispatcher;
 
     @BeforeEach
     void setUp() {
         movieQuizBot = new MovieQuizBot();
-        commandDispatcher = new CommandDispatcher(telegramClient, movieQuizBot, pomodoroBot);
+        commandDispatcher = new CommandDispatcher(telegramClient, movieQuizBot, pomodoroBot, vacancyBot);
     }
 
     @Test

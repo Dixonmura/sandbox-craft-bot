@@ -6,6 +6,7 @@ import movie_quiz.core.Movie;
 import movie_quiz.core.MovieQuizRank;
 import movie_quiz.core.QuestionView;
 import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 
@@ -23,7 +24,7 @@ import java.util.Optional;
  */
 public class MovieQuizBot {
 
-    private static final org.apache.logging.log4j.Logger log = LogManager.getLogger(MovieQuizBot.class);
+    private static final Logger log = LogManager.getLogger(MovieQuizBot.class);
     private final List<Movie> movies;
     private final Map<Long, GameManager> sessions = new HashMap<>();
 

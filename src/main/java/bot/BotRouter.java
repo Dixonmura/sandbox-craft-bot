@@ -3,6 +3,7 @@ package bot;
 import bot.utils.ReplyUtils;
 import command.CommandDispatcher;
 import markups.PomodoroKeyboardFactory;
+import markups.VacancyKeyboardKey;
 import movie_quiz.bot.BotReply;
 import movie_quiz.bot.MovieQuizBot;
 import org.apache.logging.log4j.LogManager;
@@ -16,6 +17,10 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import pomodoro.bot.PomodoroBot;
 import pomodoro.bot.PomodoroReply;
 import pomodoro.bot.PomodoroSender;
+import vacancy_tracker.bot.VacancyBot;
+import vacancy_tracker.bot.VacancyReply;
+
+import static bot.RouterMessages.*;
 
 /**
  * Маршрутизатор обновлений Telegram:
@@ -30,17 +35,20 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
     private final CommandDispatcher commandDispatcher;
     private MovieQuizBot movieQuizBot;
     private PomodoroBot pomodoroBot;
+    private VacancyBot vacancyBot;
 
     /**
-     * Создаёт маршрутизатор с новым экземпляром квиз-бота.
+     * Создаёт маршрутизатор с новым экземпляром квиз-бота, помодоро бота
+     * и инициализацией бота вакансий
      *
      * @param client Telegram-клиент для отправки сообщений
      */
-    public BotRouter(TelegramClient client) {
+    public BotRouter(TelegramClient client, VacancyBot vacancyBot) {
         this.client = client;
         this.movieQuizBot = new MovieQuizBot();
         this.pomodoroBot = new PomodoroBot(this);
-        this.commandDispatcher = new CommandDispatcher(client, movieQuizBot, pomodoroBot);
+        this.vacancyBot = vacancyBot;
+        this.commandDispatcher = new CommandDispatcher(client, movieQuizBot, pomodoroBot, this.vacancyBot);
     }
 
     /**
@@ -49,11 +57,13 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
     BotRouter(TelegramClient client,
               CommandDispatcher commandDispatcher,
               MovieQuizBot quizBot,
-              PomodoroBot pomodoroBot) {
+              PomodoroBot pomodoroBot,
+              VacancyBot vacancyBot) {
         this.client = client;
         this.commandDispatcher = commandDispatcher;
         this.movieQuizBot = quizBot;
         this.pomodoroBot = pomodoroBot;
+        this.vacancyBot = vacancyBot;
     }
 
     /**
@@ -83,123 +93,10 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
         Long chatId = update.getMessage().getChatId();
 
         if (messageText.startsWith("/")) {
-            if (movieQuizBot.hasSession(chatId)) {
-                SendMessage message = SendMessage.builder()
-                        .chatId(chatId)
-                        .text("\uD83C\uDFAC Квиз уже запущен.\n" +
-                                "\n" +
-                                "❌ Нельзя одновременно запускать два бота.\n" +
-                                "\uD83D\uDCFD Сначала завершите работу с ботом Movie Quiz, а потом попробуйте запустить другого.\n")
-                        .build();
-                log.warn("Попытка запустить commandText={} для chatId={}, когда movieQuizBot уже запущен.", messageText, chatId);
-                try {
-                    client.execute(message);
-                } catch (TelegramApiException e) {
-                    log.error("Ошибка при отправке ответа movieQuizBot в чат chatId={}", chatId, e);
-                }
-            }
-            if (pomodoroBot.hasSession(chatId)) {
-                SendMessage message = SendMessage.builder()
-                        .chatId(chatId)
-                        .text("\uD83E\uDD16 У вас уже запущен бот Pomodoro.\n" +
-                                "\uD83C\uDF45 Пожалуйста, сначала завершите текущую сессию, а затем запускайте другого бота.\n")
-                        .build();
-                log.warn("Попытка запустить commandText={} для chatId={}, когда PomodoroBot уже запущен.", messageText, chatId);
-
-                try {
-                    client.execute(message);
-                } catch (TelegramApiException e) {
-                    log.error("Ошибка при отправке ответа Pomodoro в чат chatId={}", chatId, e);
-                }
-                return;
-            }
-            if (!movieQuizBot.hasSession(chatId) && !pomodoroBot.hasSession(chatId)) {
-                log.info("Получена команда '{}' от chatId={}", messageText, chatId);
-                commandDispatcher.dispatch(messageText, update);
-                return;
-            }
+            handleCommand(chatId, messageText, update);
         }
 
-        if (!movieQuizBot.hasSession(chatId) && !pomodoroBot.hasSession(chatId)) {
-
-            var from = update.getMessage().getFrom();
-            String firstName = from != null ? from.getFirstName() : "unknown";
-            String userName = from != null ? from.getUserName() : "unknown";
-            log.info("Получено обычное сообщение без активной сессии, chatId={}, firstName={}, userName={}, text={}",
-                    chatId, firstName, userName, messageText);
-
-            SendMessage message = SendMessage.builder()
-                    .chatId(chatId)
-                    .text("Сейчас я понимаю только команды, выберите в меню новую команду или введите вручную.\n")
-                    .build();
-
-            try {
-                client.execute(message);
-            } catch (TelegramApiException e) {
-                log.error("Не удалось отправить системное сообщение пользователю, chatId={}", chatId, e);
-            }
-        }
-
-        if (movieQuizBot.hasSession(chatId)) {
-            log.info("Обработка ответа квиза от chatId={}", chatId);
-
-            BotReply reply = movieQuizBot.handleAnswer(update);
-            SendPhoto sendPhoto = ReplyUtils.sendPhotoQuiz(reply, chatId, getClass().getClassLoader());
-            SendMessage sendMessage = ReplyUtils.sendMessageQuiz(reply, chatId);
-
-            try {
-                if (sendPhoto != null) {
-                    client.execute(sendPhoto);
-                }
-                client.execute(sendMessage);
-            } catch (TelegramApiException e) {
-                log.error("Ошибка при отправке ответа квиза в чат chatId={}", chatId, e);
-                SendMessage fallback = SendMessage.builder()
-                        .chatId(chatId)
-                        .text(sendMessage.getText() + "\n\n(⚠️ Картинку отправить не удалось из-за ошибки соединения.)")
-                        .build();
-                try {
-                    client.execute(fallback);
-                } catch (TelegramApiException ex) {
-                    log.error("Ошибка при отправке fallback-сообщения квиза в чат chatId={}", chatId, ex);
-                }
-            }
-        }
-
-        if (pomodoroBot.hasSession(chatId)) {
-            log.info("Обработка ответа Pomodoro от chatId={}", chatId);
-
-            PomodoroReply reply = pomodoroBot.handleAnswer(update);
-            SendPhoto sendPhoto = null;
-
-            if (reply.imagePath() != null) {
-                sendPhoto = ReplyUtils.sendPhotoPomodoro(reply, chatId, getClass().getClassLoader());
-            }
-
-            SendMessage sendMessage = ReplyUtils.sendMessagePomodoro(reply, chatId);
-
-            try {
-                if (sendPhoto != null) {
-                    client.execute(sendPhoto);
-                }
-                if (sendMessage == null || sendMessage.getText().isBlank()) {
-                    log.warn("Пропуск отправки пустого сообщения Pomodoro для chatId={}", chatId);
-                    return;
-                }
-                client.execute(sendMessage);
-            } catch (TelegramApiException e) {
-                log.error("Ошибка при отправке ответа Pomodoro в чат chatId={}", chatId, e);
-                SendMessage fallback = SendMessage.builder()
-                        .chatId(chatId)
-                        .text(sendMessage.getText() + "\n\n(⚠️ Мотивашку с картинкой отправить не удалось из-за ошибки соединения.)")
-                        .build();
-                try {
-                    client.execute(fallback);
-                } catch (TelegramApiException ex) {
-                    log.error("Ошибка при отправке fallback-сообщения Pomodoro в чат chatId={}", chatId, ex);
-                }
-            }
-        }
+        handlePlainMessage(chatId, messageText, update);
     }
 
     @Override
@@ -249,6 +146,161 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
             client.execute(message);
         } catch (TelegramApiException e) {
             log.error("Ошибка при отправке вопроса о выводе статистики Pomodoro в чат chatId={}", chatId, e);
+        }
+    }
+
+    private void handleCommand(Long chatId, String messageText, Update update) {
+
+        if (movieQuizBot.hasSession(chatId)) {
+            SendMessage message = SendMessage.builder()
+                    .chatId(chatId)
+                    .text(QUIZ_IS_ACTIVE)
+                    .build();
+            log.warn("Попытка запустить commandText={} для chatId={}, когда movieQuizBot уже запущен.", messageText, chatId);
+            try {
+                client.execute(message);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке ответа movieQuizBot в чат chatId={}", chatId, e);
+            }
+            return;
+        }
+
+        if (pomodoroBot.hasSession(chatId)) {
+            SendMessage message = SendMessage.builder()
+                    .chatId(chatId)
+                    .text(POMODORO_IS_ACTIVE)
+                    .build();
+            log.warn("Попытка запустить commandText={} для chatId={}, когда PomodoroBot уже запущен.", messageText, chatId);
+
+            try {
+                client.execute(message);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке ответа Pomodoro в чат chatId={}", chatId, e);
+            }
+            return;
+        }
+
+        if (vacancyBot.isConfiguring(chatId)) {
+            SendMessage message = SendMessage.builder()
+                    .chatId(chatId)
+                    .text(VACANCY_IS_CONFIGURE)
+                    .build();
+            log.warn("Попытка запустить commandText={} для chatId={}, когда VacancyBot уже запущен.", messageText, chatId);
+
+            try {
+                client.execute(message);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке ответа Pomodoro в чат chatId={}", chatId, e);
+            }
+            return;
+        }
+
+        log.info("Получена команда '{}' от chatId={}", messageText, chatId);
+        commandDispatcher.dispatch(messageText, update);
+    }
+
+    private void handlePlainMessage(Long chatId, String messageText, Update update) {
+
+        if (movieQuizBot.hasSession(chatId)) {
+            log.info("Обработка ответа квиза от chatId={}", chatId);
+
+            BotReply reply = movieQuizBot.handleAnswer(update);
+            SendPhoto sendPhoto = ReplyUtils.sendPhotoQuiz(reply, chatId, getClass().getClassLoader());
+            SendMessage sendMessage = ReplyUtils.sendMessageQuiz(reply, chatId);
+
+            try {
+                if (sendPhoto != null) {
+                    client.execute(sendPhoto);
+                }
+                client.execute(sendMessage);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке ответа квиза в чат chatId={}", chatId, e);
+                SendMessage fallback = SendMessage.builder()
+                        .chatId(chatId)
+                        .text(sendMessage.getText() + "\n\n(⚠️ Картинку отправить не удалось из-за ошибки соединения.)")
+                        .build();
+                try {
+                    client.execute(fallback);
+                } catch (TelegramApiException ex) {
+                    log.error("Ошибка при отправке fallback-сообщения квиза в чат chatId={}", chatId, ex);
+                }
+            }
+            return;
+        }
+
+        if (pomodoroBot.hasSession(chatId)) {
+            log.info("Обработка ответа Pomodoro от chatId={}", chatId);
+
+            PomodoroReply reply = pomodoroBot.handleAnswer(update);
+            SendPhoto sendPhoto = null;
+
+            if (reply.imagePath() != null) {
+                sendPhoto = ReplyUtils.sendPhotoPomodoro(reply, chatId, getClass().getClassLoader());
+            }
+
+            SendMessage sendMessage = ReplyUtils.sendMessagePomodoro(reply, chatId);
+
+            try {
+                if (sendPhoto != null) {
+                    client.execute(sendPhoto);
+                }
+                if (sendMessage == null || sendMessage.getText().isBlank()) {
+                    log.warn("Пропуск отправки пустого сообщения Pomodoro для chatId={}", chatId);
+                    return;
+                }
+                client.execute(sendMessage);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке ответа Pomodoro в чат chatId={}", chatId, e);
+                SendMessage fallback = SendMessage.builder()
+                        .chatId(chatId)
+                        .text(sendMessage.getText() + "\n\n(⚠️ Мотивашку с картинкой отправить не удалось из-за ошибки соединения.)")
+                        .build();
+                try {
+                    client.execute(fallback);
+                } catch (TelegramApiException ex) {
+                    log.error("Ошибка при отправке fallback-сообщения Pomodoro в чат chatId={}", chatId, ex);
+                }
+            }
+            return;
+        }
+
+        if (vacancyBot.isConfiguring(chatId)) {
+            log.info("Обработка ответа VacancyBot от chatId={}", chatId);
+
+            VacancyReply reply = vacancyBot.handleAnswer(update);
+            SendMessage sendMessage = ReplyUtils.sendMessageVacancy(reply);
+
+            try {
+                client.execute(sendMessage);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке ответа VacancyBot в чат chatId={}", chatId, e);
+            }
+            return;
+        }
+
+        if (vacancyBot.isActive(chatId)) {
+
+            VacancyReply reply = new VacancyReply(chatId, VACANCY_IS_ACTIVE, VacancyKeyboardKey.STOP_KEYBOARD);
+
+            SendMessage message = ReplyUtils.sendMessageVacancy(reply);
+
+            try {
+                client.execute(message);
+            } catch (TelegramApiException e) {
+                log.error("Не удалось отправить системное сообщение пользователю, chatId={}", chatId, e);
+            }
+            return;
+        }
+
+        log.info("Получено обычное сообщение без активных сессий, chatId={}, text={}", chatId, messageText);
+        SendMessage message = SendMessage.builder()
+                .chatId(chatId)
+                .text(COMMAND_UNDERSTAND_MESSAGE)
+                .build();
+        try {
+            client.execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Не удалось отправить системное сообщение пользователю, chatId={}", chatId, e);
         }
     }
 }

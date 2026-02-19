@@ -2,6 +2,8 @@ package vacancy_tracker.core;
 
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Application-сервис для сценариев работы с пользователем:
@@ -10,6 +12,7 @@ import java.time.ZoneOffset;
 public class UserService {
 
     private final UserRepository repository;
+    private final Map<Long, VacancySessionState> sessionStates = new ConcurrentHashMap<>();
 
     public UserService(UserRepository repository) {
         if (repository == null) {
@@ -165,6 +168,20 @@ public class UserService {
     }
 
     /**
+     * Устанавливает состояние сессии для пользователя.
+     * Бросает IllegalArgumentException, если userId или sessionState null.
+     */
+    public void setStateSession(Long userId, VacancySessionState sessionState) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        if (sessionState == null) {
+            throw new IllegalArgumentException("sessionState не может быть null");
+        }
+        sessionStates.put(userId, sessionState);
+    }
+
+    /**
      * Читает текущее состояние пользователя для поиска вакансий.
      * Если пользователь с таким userId не найден, будет создан новый.
      * Бросает IllegalArgumentException, если userId null.
@@ -175,5 +192,16 @@ public class UserService {
         }
         User user = getOrCreateUser(userId);
         return user.getSettingState();
+    }
+
+    /**
+     * Читает и возвращает текущее состояние сессии для пользователя.
+     * Бросает IllegalArgumentException, если userId null.
+     */
+    public VacancySessionState getStateSessionOrDefault(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        return sessionStates.getOrDefault(userId, VacancySessionState.INACTIVE);
     }
 }

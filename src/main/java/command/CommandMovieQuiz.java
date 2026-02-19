@@ -64,4 +64,3 @@ public class CommandMovieQuiz implements Command {
         }
     }
 }
-

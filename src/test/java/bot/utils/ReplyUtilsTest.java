@@ -1,5 +1,6 @@
 package bot.utils;
 
+import markups.VacancyKeyboardKey;
 import movie_quiz.bot.BotReply;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.DisplayName;
@@ -8,11 +9,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import pomodoro.bot.PomodoroReply;
+import vacancy_tracker.bot.CallbackPrefixes;
+import vacancy_tracker.bot.VacancyReply;
+import vacancy_tracker.bot.types.SettingOptions;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -111,6 +117,95 @@ class ReplyUtilsTest {
         assertThat(photo).isNotNull();
         assertThat(photo.getChatId()).isEqualTo("11");
         assertThat(photo.getPhoto()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Проверка формирования сообщения с клавиатурой для выбора региона")
+    void sendMessage_shouldCreateSendMessageWithRegionKeyboard() {
+        SendMessage messageWithRegionKeyboard = ReplyUtils.sendMessageVacancy(
+                new VacancyReply(76L, SettingOptions.REGION.getTitle(), VacancyKeyboardKey.REGION_KEYBOARD)
+        );
+        assertThat(messageWithRegionKeyboard.getChatId())
+                .isEqualTo("76");
+
+        assertThat(messageWithRegionKeyboard.getText())
+                .isEqualTo(SettingOptions.REGION.getTitle());
+
+        assertThat(messageWithRegionKeyboard.getReplyMarkup())
+                .isInstanceOf(InlineKeyboardMarkup.class);
+
+        InlineKeyboardMarkup markup = (InlineKeyboardMarkup) messageWithRegionKeyboard.getReplyMarkup();
+        assertThat(markup.getKeyboard())
+                .isNotEmpty()
+                .hasSize(6);
+
+        InlineKeyboardRow row = markup.getKeyboard().getFirst();
+        assertThat(row)
+                .isNotEmpty()
+                .hasSize(1);
+
+        assertThat(row.getFirst().getCallbackData())
+                .isNotNull()
+                .isEqualTo(CallbackPrefixes.REGION_CODE_PREFIX + "1");
+
+    }
+
+    @Test
+    @DisplayName("Проверка формирования сообщения с клавиатурой для выбора запуска планировщика")
+    void sendMessage_shouldCreateSendMessageWithReadyKeyboard() {
+        SendMessage messageWithRegionKeyboard = ReplyUtils.sendMessageVacancy(
+                new VacancyReply(45L, SettingOptions.MIN_SALARY.getTitle(), VacancyKeyboardKey.MIN_SALARY_KEYBOARD)
+        );
+        assertThat(messageWithRegionKeyboard.getChatId())
+                .isEqualTo("45");
+
+        assertThat(messageWithRegionKeyboard.getText())
+                .isEqualTo(SettingOptions.MIN_SALARY.getTitle());
+
+        assertThat(messageWithRegionKeyboard.getReplyMarkup())
+                .isInstanceOf(InlineKeyboardMarkup.class);
+
+        InlineKeyboardMarkup markup = (InlineKeyboardMarkup) messageWithRegionKeyboard.getReplyMarkup();
+        assertThat(markup.getKeyboard())
+                .isNotEmpty()
+                .hasSize(6);
+
+        InlineKeyboardRow row = markup.getKeyboard().getFirst();
+        assertThat(row)
+                .isNotEmpty()
+                .hasSize(1);
+
+        assertThat(row.getFirst().getCallbackData())
+                .isNotNull()
+                .isEqualTo(CallbackPrefixes.SALARY_PREFIX + "25000");
+
+    }
+
+    @Test
+    @DisplayName("Проверка формирования сообщения с клавиатурой для старта VacancyBot")
+    void sendMessage_shouldCreateSendMessageWithStartKeyboard() {
+        SendMessage messageWithStartKeyboard = ReplyUtils.sendMessageVacancy(
+                new VacancyReply(77L, "startVacancyBot", VacancyKeyboardKey.START_KEYBOARD)
+        );
+
+        assertThat(messageWithStartKeyboard.getText())
+                .isEqualTo("startVacancyBot");
+
+        ReplyKeyboard keyboardMarkup = messageWithStartKeyboard.getReplyMarkup();
+
+        assertThat(keyboardMarkup)
+                .isNotNull()
+                .isInstanceOf(InlineKeyboardMarkup.class);
+    }
+
+    @Test
+    @DisplayName("Если ключ NONE, сообщение создаётся без клавиатуры")
+    void sendMessage_shouldNotSetKeyboard_whenKeyIsNone() {
+        VacancyReply reply = new VacancyReply(76L, "text", VacancyKeyboardKey.NONE);
+
+        SendMessage message = ReplyUtils.sendMessageVacancy(reply);
+
+        assertThat(message.getReplyMarkup()).isNull();
     }
 
     @Test

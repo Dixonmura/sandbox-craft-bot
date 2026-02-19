@@ -43,6 +43,27 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("Проверка корректной установки состояния сессии и получения актуального состояния")
+    void setSessionState_shouldReturnOrInstallCurrentState_whenUsedByDifferentUsers() {
+        userService.setStateSession(USER_ID, VacancySessionState.CONFIGURING);
+        VacancySessionState firstUserState = userService.getStateSessionOrDefault(USER_ID);
+        assertThat(firstUserState)
+                .isNotNull()
+                .isEqualByComparingTo(VacancySessionState.CONFIGURING);
+
+        userService.setStateSession(USER_ID, VacancySessionState.ACTIVE);
+        firstUserState = userService.getStateSessionOrDefault(USER_ID);
+        assertThat(firstUserState)
+                .isNotNull()
+                .isEqualByComparingTo(VacancySessionState.ACTIVE);
+
+        VacancySessionState secondUserState = userService.getStateSessionOrDefault(77L);
+        assertThat(secondUserState)
+                .isNotNull()
+                .isEqualByComparingTo(VacancySessionState.INACTIVE);
+    }
+
+    @Test
     @DisplayName("Проверка корректного сдвига часового пояса")
     void updateUtcOffset_shouldAcceptNewZoneOffset_whenDataIsValid() {
         User user = userService.updateUtcOffset(USER_ID, ZoneOffset.of("+07:00"));
@@ -85,9 +106,24 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("Проверка выбрасывания исключения при попытке обновления состояния сессии, когда userId или state null")
+    void setStateSession_shouldThrowsIllegalArgumentException_whenUserIdOrStateSessionIsNull() {
+        assertThatThrownBy(() ->
+                userService.setStateSession(null, VacancySessionState.CONFIGURING))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("userId не может быть null");
+
+        assertThatThrownBy(() ->
+                userService.setStateSession(USER_ID, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("sessionState не может быть null");
+    }
+
+    @Test
     @DisplayName("Проверка выбрасывания исключения при попытке создания экземпляра, когда Repository null")
     void constructor_shouldThrowsIllegalArgumentException_whenRepositoryIsNull() {
-        assertThatThrownBy(() -> new UserService(null))
+        assertThatThrownBy(() ->
+                new UserService(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Repository не может быть null");
     }
