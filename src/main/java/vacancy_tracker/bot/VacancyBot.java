@@ -77,4 +77,3 @@ public class VacancyBot {
         return userService.getStateSessionOrDefault(chatId) == VacancySessionState.INACTIVE;
     }
 }
-

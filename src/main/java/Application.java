@@ -22,7 +22,6 @@ import java.util.concurrent.TimeUnit;
 public class Application {
     public static void main(String[] args) {
 
-
         ConfigReaderEnvironment configReader = new ConfigReaderEnvironment(new SystemEnvProvider());
         Config token = configReader.reader();
         ObjectMapper mapper = new ObjectMapper();
