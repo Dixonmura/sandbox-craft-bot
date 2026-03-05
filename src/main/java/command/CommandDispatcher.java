@@ -1,5 +1,6 @@
 package command;
 
+import bot.RouterOptions;
 import movie_quiz.bot.MovieQuizBot;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -10,6 +11,8 @@ import vacancy_tracker.bot.VacancyBot;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import static bot.RouterOptions.*;
 
 /**
  * Диспетчер команд Telegram-бота.
@@ -35,9 +38,9 @@ public class CommandDispatcher {
             PomodoroBot pomodoroBot,
             VacancyBot vacancyBot) {
         commandMap.put("/start", new CommandStart(telegramClient));
-        commandMap.put("/playmoviequiz", new CommandMovieQuiz(telegramClient, quizBot));
-        commandMap.put("/startpomodoro", new CommandPomodoro(telegramClient, pomodoroBot));
-        commandMap.put("/startvacancybot", new CommandVacancy(telegramClient, vacancyBot));
+        commandMap.put(START_MOVIE_QUIZ.getCommand(), new CommandMovieQuiz(telegramClient, quizBot));
+        commandMap.put(START_POMODORO.getCommand(), new CommandPomodoro(telegramClient, pomodoroBot));
+        commandMap.put(START_VACANCY_TRACKER.getCommand(), new CommandVacancy(telegramClient, vacancyBot));
     }
 
     /**

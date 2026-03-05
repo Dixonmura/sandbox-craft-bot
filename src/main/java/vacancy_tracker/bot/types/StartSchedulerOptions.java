@@ -1,13 +1,12 @@
 package vacancy_tracker.bot.types;
 
-public enum StartBotOption {
+public enum StartSchedulerOptions {
 
-    START_BOT("Старт");
-
+    START_SCHEDULER("🚀 Запустить планировщик");
 
     private final String title;
 
-    StartBotOption(String title) {
+    StartSchedulerOptions(String title) {
         this.title = title;
     }
 

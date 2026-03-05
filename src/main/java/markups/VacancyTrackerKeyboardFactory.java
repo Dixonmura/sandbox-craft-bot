@@ -1,5 +1,7 @@
 package markups;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -11,9 +13,16 @@ import java.util.List;
 
 import static org.apache.commons.lang3.math.NumberUtils.min;
 import static vacancy_tracker.bot.CallbackPrefixes.*;
+import static vacancy_tracker.bot.types.ReadyAction.COMPLETE;
+import static vacancy_tracker.bot.types.ReadyAction.GO_BACK;
 import static vacancy_tracker.bot.types.SettingOptions.*;
+import static vacancy_tracker.bot.types.StartSchedulerOptions.START_SCHEDULER;
+import static vacancy_tracker.bot.types.StartStopBotOption.OUT_IN_ROUTER;
+import static vacancy_tracker.bot.types.StartStopBotOption.STOP_BOT;
 
 public class VacancyTrackerKeyboardFactory {
+
+    private static final Logger log = LogManager.getLogger(VacancyTrackerKeyboardFactory.class);
 
     private final List<String> utcOffsets = List.of(
             "UTC-12:00",
@@ -28,7 +37,6 @@ public class VacancyTrackerKeyboardFactory {
             "UTC-03:00",
             "UTC-02:00",
             "UTC-01:00",
-            "UTC±00:00",
             "UTC+01:00",
             "UTC+02:00",
             "UTC+03:00",
@@ -173,10 +181,26 @@ public class VacancyTrackerKeyboardFactory {
         InlineKeyboardMarkup.InlineKeyboardMarkupBuilder<?, ?> inlineKeyboard = InlineKeyboardMarkup.builder();
 
         var startButton = InlineKeyboardButton.builder();
-        startButton.text(StartBotOption.START_BOT.getTitle())
-                .callbackData(StartBotOption.START_BOT.getTitle());
+        startButton.text(StartStopBotOption.START_BOT.getTitle())
+                .callbackData(StartStopBotOption.START_BOT.getTitle());
 
         inlineKeyboard.keyboardRow(new InlineKeyboardRow(startButton.build()));
+        return inlineKeyboard.build();
+    }
+
+    public InlineKeyboardMarkup createStartAndStopKeyboard() {
+        InlineKeyboardMarkup.InlineKeyboardMarkupBuilder<?, ?> inlineKeyboard = InlineKeyboardMarkup.builder();
+
+        var startButton = InlineKeyboardButton.builder();
+        startButton.text(StartStopBotOption.START_BOT.getTitle())
+                .callbackData(StartStopBotOption.START_BOT.getTitle());
+
+        var stopButtonBuilder = InlineKeyboardButton.builder();
+        stopButtonBuilder.text(STOP_BOT.getTitle());
+        stopButtonBuilder.callbackData(STOP_BOT.getTitle());
+
+        inlineKeyboard.keyboardRow(new InlineKeyboardRow(startButton.build()));
+        inlineKeyboard.keyboardRow(new InlineKeyboardRow(stopButtonBuilder.build()));
         return inlineKeyboard.build();
     }
 
@@ -192,7 +216,12 @@ public class VacancyTrackerKeyboardFactory {
         int fromIndex = page * PAGE_SIZE;
         int toIndex = min(fromIndex + PAGE_SIZE, utcOffsets.size());
 
+        log.debug("Create UTC keyboard: page={}, fromIndex={}, toIndex={}, total={}",
+                page, fromIndex, toIndex, utcOffsets.size());
+
         if (fromIndex > utcOffsets.size()) {
+            log.warn("UTC keyboard page out of range: page={}, totalPages≈{}",
+                    page, (utcOffsets.size() + PAGE_SIZE - 1) / PAGE_SIZE);
             throw new IllegalArgumentException("Номер страницы превышает размер списка");
         }
 
@@ -240,40 +269,54 @@ public class VacancyTrackerKeyboardFactory {
     }
 
     public InlineKeyboardMarkup createSettingKeyboard() {
+        log.debug("Creating SETTING_KEYBOARD");
+
         InlineKeyboardMarkup.InlineKeyboardMarkupBuilder<?, ?> inlineKeyboard = InlineKeyboardMarkup.builder();
+
+        var utcButton = InlineKeyboardButton.builder();
+        utcButton.text(UTC_OPTION.getTitle());
+        utcButton.callbackData(SETTING_PREFIX + UTC_OPTION.getTitle());
 
         var regionButton = InlineKeyboardButton.builder();
         regionButton.text(REGION.getTitle());
-        regionButton.callbackData(SETTING_PREFIX + REGION);
+        regionButton.callbackData(SETTING_PREFIX + REGION.getTitle());
 
         var minExperience = InlineKeyboardButton.builder();
         minExperience.text(MIN_EXPERIENCE.getTitle());
-        minExperience.callbackData(SETTING_PREFIX + MIN_EXPERIENCE);
+        minExperience.callbackData(SETTING_PREFIX + MIN_EXPERIENCE.getTitle());
 
         var minSalary = InlineKeyboardButton.builder();
         minSalary.text(MIN_SALARY.getTitle());
-        minSalary.callbackData(SETTING_PREFIX + MIN_SALARY);
+        minSalary.callbackData(SETTING_PREFIX + MIN_SALARY.getTitle());
 
         var wordForSearch = InlineKeyboardButton.builder();
         wordForSearch.text(WORD_FOR_SEARCH.getTitle());
-        wordForSearch.callbackData(SETTING_PREFIX + WORD_FOR_SEARCH);
+        wordForSearch.callbackData(SETTING_PREFIX + WORD_FOR_SEARCH.getTitle());
 
         var settingNotify = InlineKeyboardButton.builder();
         settingNotify.text(SETTINGS_NOTIFICATION.getTitle());
-        settingNotify.callbackData(SETTING_PREFIX + SETTINGS_NOTIFICATION);
+        settingNotify.callbackData(SETTING_PREFIX + SETTINGS_NOTIFICATION.getTitle());
 
         var completeButton = InlineKeyboardButton.builder();
-        completeButton.text(ReadyAction.COMPLETE.getTitle());
-        completeButton.callbackData(SETTING_PREFIX + ReadyAction.COMPLETE);
+        completeButton.text(START_SCHEDULER.getTitle());
+        completeButton.callbackData(SETTING_PREFIX + START_SCHEDULER.getTitle());
 
+        var homeButton = InlineKeyboardButton.builder();
+        homeButton.text(OUT_IN_ROUTER.getTitle());
+        homeButton.callbackData(OUT_IN_ROUTER.getTitle());
+
+        inlineKeyboard.keyboardRow(new InlineKeyboardRow(utcButton.build()));
         inlineKeyboard.keyboardRow(new InlineKeyboardRow(regionButton.build()));
         inlineKeyboard.keyboardRow(new InlineKeyboardRow(minExperience.build()));
         inlineKeyboard.keyboardRow(new InlineKeyboardRow(minSalary.build()));
         inlineKeyboard.keyboardRow(new InlineKeyboardRow(wordForSearch.build()));
         inlineKeyboard.keyboardRow(new InlineKeyboardRow(settingNotify.build()));
         inlineKeyboard.keyboardRow(new InlineKeyboardRow(completeButton.build()));
+        inlineKeyboard.keyboardRow(new InlineKeyboardRow(homeButton.build()));
 
-        return inlineKeyboard.build();
+        InlineKeyboardMarkup markup = inlineKeyboard.build();
+        log.debug("SETTING_KEYBOARD created: rows={}", markup.getKeyboard().size());
+        return markup;
     }
 
     public InlineKeyboardMarkup createRegionKeyboard(int page) {
@@ -288,7 +331,12 @@ public class VacancyTrackerKeyboardFactory {
         int fromIndex = page * PAGE_SIZE;
         int toIndex = min(fromIndex + PAGE_SIZE, listRegions.size());
 
+        log.debug("Create region keyboard: page={}, fromIndex={}, toIndex={}, total={}",
+                page, fromIndex, toIndex, listRegions.size());
+
         if (fromIndex > listRegions.size()) {
+            log.warn("Region keyboard page out of range: page={}, totalPages≈{}",
+                    page, (listRegions.size() + PAGE_SIZE - 1) / PAGE_SIZE);
             throw new IllegalArgumentException("Номер страницы превышает размер списка");
         }
 
@@ -352,7 +400,7 @@ public class VacancyTrackerKeyboardFactory {
 
         var rowCompleteButtonBuilder = InlineKeyboardButton.builder();
         rowCompleteButtonBuilder.text(ExperienceOption.WITHOUT_EXPERIENCE.getTitle());
-        rowCompleteButtonBuilder.callbackData(EXPERIENCE_PREFIX + ExperienceOption.WITHOUT_EXPERIENCE);
+        rowCompleteButtonBuilder.callbackData(EXPERIENCE_PREFIX + 0);
         inlineKeyboard.keyboardRow(new InlineKeyboardRow(rowCompleteButtonBuilder.build()));
 
         return inlineKeyboard.build();
@@ -371,7 +419,7 @@ public class VacancyTrackerKeyboardFactory {
 
         var rowCompleteButtonBuilder = InlineKeyboardButton.builder();
         rowCompleteButtonBuilder.text(SalaryOption.NOT_TAKE_SALARY.getTitle());
-        rowCompleteButtonBuilder.callbackData(SALARY_PREFIX + SalaryOption.NOT_TAKE_SALARY);
+        rowCompleteButtonBuilder.callbackData(SALARY_PREFIX + 0);
         inlineKeyboard.keyboardRow(new InlineKeyboardRow(rowCompleteButtonBuilder.build()));
 
         return inlineKeyboard.build();
@@ -407,7 +455,12 @@ public class VacancyTrackerKeyboardFactory {
         int fromIndex = page * PAGE_SIZE;
         int toIndex = min(fromIndex + PAGE_SIZE, notifyTimelist.size());
 
+        log.debug("Create notifyTime keyboard: page={}, fromIndex={}, toIndex={}, total={}",
+                page, fromIndex, toIndex, notifyTimelist.size());
+
         if (fromIndex > notifyTimelist.size()) {
+            log.warn("NotifyTime keyboard page out of range: page={}, totalPages≈{}",
+                    page, (notifyTimelist.size() + PAGE_SIZE - 1) / PAGE_SIZE);
             throw new IllegalArgumentException("Номер страницы превышает размер списка");
         }
 
@@ -419,8 +472,7 @@ public class VacancyTrackerKeyboardFactory {
         for (String notifyTime : pageNotifyTime) {
             var buttonBuilder = InlineKeyboardButton.builder();
             buttonBuilder.text(notifyTime);
-            var withoutColon = notifyTime.replace(":", "");
-            buttonBuilder.callbackData(NOTIFY_TIME_PREFIX + withoutColon);
+            buttonBuilder.callbackData(NOTIFY_TIME_PREFIX + notifyTime);
             inlineKeyboard.keyboardRow(new InlineKeyboardRow(buttonBuilder.build()));
         }
 
@@ -458,11 +510,11 @@ public class VacancyTrackerKeyboardFactory {
 
         var yesButtonBuilder = InlineKeyboardButton.builder();
         yesButtonBuilder.text(ReadyAction.YES.getTitle());
-        yesButtonBuilder.callbackData(YES_OR_NO_PREFIX + ReadyAction.YES);
+        yesButtonBuilder.callbackData(YES_OR_NO_PREFIX + ReadyAction.YES.getTitle());
 
         var noButtonBuilder = InlineKeyboardButton.builder();
         noButtonBuilder.text(ReadyAction.NO.getTitle());
-        noButtonBuilder.callbackData(YES_OR_NO_PREFIX + ReadyAction.NO);
+        noButtonBuilder.callbackData(YES_OR_NO_PREFIX + ReadyAction.NO.getTitle());
 
         List<InlineKeyboardButton> rowButtons = new ArrayList<>();
         rowButtons.add(yesButtonBuilder.build());
@@ -478,23 +530,32 @@ public class VacancyTrackerKeyboardFactory {
         InlineKeyboardMarkup.InlineKeyboardMarkupBuilder<?, ?> inlineKeyboard = InlineKeyboardMarkup.builder();
 
         var readyButtonBuilder = InlineKeyboardButton.builder();
-        readyButtonBuilder.text(StartStopOptions.START.getTitle());
-        readyButtonBuilder.callbackData(READY_PREFIX + StartStopOptions.START);
+        readyButtonBuilder.text(COMPLETE.getTitle());
+        readyButtonBuilder.callbackData(READY_PREFIX + COMPLETE.getTitle());
+
+        var returnButtonBuilder = InlineKeyboardButton.builder();
+        returnButtonBuilder.text(GO_BACK.getTitle());
+        returnButtonBuilder.callbackData(READY_PREFIX + GO_BACK.getTitle());
 
         inlineKeyboard.keyboardRow(new InlineKeyboardRow(readyButtonBuilder.build()));
+        inlineKeyboard.keyboardRow(new InlineKeyboardRow(returnButtonBuilder.build()));
 
         return inlineKeyboard.build();
     }
 
-    public InlineKeyboardMarkup createStopKeyboard() {
-        InlineKeyboardMarkup.InlineKeyboardMarkupBuilder<?, ?> inlineKeyboard = InlineKeyboardMarkup.builder();
+    public InlineKeyboardMarkup createBotStopKeyboard() {
+        var stopButtonBuilder = InlineKeyboardButton.builder();
+        stopButtonBuilder.text(STOP_BOT.getTitle());
+        stopButtonBuilder.callbackData(STOP_BOT.getTitle());
 
-        var readyButtonBuilder = InlineKeyboardButton.builder();
-        readyButtonBuilder.text(StartStopOptions.STOP.getTitle());
-        readyButtonBuilder.callbackData(STOP_PREFIX + StartStopOptions.STOP);
+        var homeButtonBuilder = InlineKeyboardButton.builder();
+        homeButtonBuilder.text(OUT_IN_ROUTER.getTitle());
+        homeButtonBuilder.callbackData(OUT_IN_ROUTER.getTitle());
 
-        inlineKeyboard.keyboardRow(new InlineKeyboardRow(readyButtonBuilder.build()));
 
-        return inlineKeyboard.build();
+        return InlineKeyboardMarkup.builder()
+                .keyboardRow(new InlineKeyboardRow(stopButtonBuilder.build()))
+                .keyboardRow(new InlineKeyboardRow(homeButtonBuilder.build()))
+                .build();
     }
 }

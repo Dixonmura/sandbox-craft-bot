@@ -1,5 +1,7 @@
 package vacancy_tracker.core;
 
+import vacancy_tracker.bot.VacancySender;
+
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -16,6 +18,15 @@ public class ScheduledNotificationService implements NotificationService {
             Executors.newScheduledThreadPool(4);
 
     final Map<Long, List<ScheduledFuture<?>>> tasksByUser = new ConcurrentHashMap<>();
+    private UserService userService;
+    private final VacancySearchService vacancySearchService;
+    private final VacancySender vacancySender;
+
+    public ScheduledNotificationService(UserService userService, VacancySearchService vacancySearchService, VacancySender vacancySender) {
+        this.userService = userService;
+        this.vacancySearchService = vacancySearchService;
+        this.vacancySender = vacancySender;
+    }
 
     @Override
     public void scheduleNotifications(User user) {
@@ -28,8 +39,8 @@ public class ScheduledNotificationService implements NotificationService {
         ZoneOffset offset = user.getUtcOffset();
         LocalTime notifyTime = (user.getSettings() != null) ? user.getSettings().getNotificationTime() : null;
 
-        if (offset == null || notifyTime == null) {
-            throw new IllegalStateException("Нельзя запланировать уведомления без utcOffset или notificationTime");
+        if (notifyTime == null) {
+            throw new IllegalStateException("Нельзя запланировать уведомления без notificationTime");
         }
 
         long initialDelayMillis = computeInitialDelayMillis(Instant.now(), offset, notifyTime);
@@ -97,8 +108,17 @@ public class ScheduledNotificationService implements NotificationService {
      */
     private Runnable createNotificationTask(Long userId) {
         return () -> {
-            //TODO подключить VacancySearchService и отправку VacancyReply
-            System.out.println("Выполняется задача уведомления для userId=" + userId);
+            try {
+                User user = userService.getOrCreateUser(userId);
+                if (user != null && user.isSettingsReady()) {
+                    List<Vacancy> vacancies = vacancySearchService.findVacancies(user.getSettings());
+                    if (!vacancies.isEmpty()) {
+                        vacancySender.sendVacancies(userId, vacancies);
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
         };
     }
 }

@@ -12,6 +12,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static vacancy_tracker.bot.types.ReadyAction.COMPLETE;
+import static vacancy_tracker.bot.types.StartStopBotOption.OUT_IN_ROUTER;
 
 class VacancyTrackerKeyboardFactoryTest {
 
@@ -36,10 +38,41 @@ class VacancyTrackerKeyboardFactoryTest {
                 .hasSize(1);
 
         assertThat(row.getFirst().getText())
-                .isEqualTo(StartBotOption.START_BOT.getTitle());
+                .isEqualTo(StartStopBotOption.START_BOT.getTitle());
 
         assertThat(row.getFirst().getCallbackData())
-                .isEqualTo(StartBotOption.START_BOT.getTitle());
+                .isEqualTo(StartStopBotOption.START_BOT.getTitle());
+    }
+
+    @Test
+    @DisplayName("Проверка корректного создания клавиатуры запуска или остановки бота в активном состоянии")
+    void createStartKeyboard_shouldCreateStartAndStopKeyboard() {
+        InlineKeyboardMarkup keyboardMarkup = keyboardFactory.createStartAndStopKeyboard();
+        assertThat(keyboardMarkup.getKeyboard())
+                .isNotEmpty()
+                .hasSize(2);
+
+        InlineKeyboardRow firstRow = keyboardMarkup.getKeyboard().getFirst();
+        assertThat(firstRow)
+                .isNotEmpty()
+                .hasSize(1);
+
+        assertThat(firstRow.getFirst().getText())
+                .isEqualTo(StartStopBotOption.START_BOT.getTitle());
+
+        assertThat(firstRow.getFirst().getCallbackData())
+                .isEqualTo(StartStopBotOption.START_BOT.getTitle());
+
+        InlineKeyboardRow secondRow = keyboardMarkup.getKeyboard().getLast();
+        assertThat(secondRow)
+                .isNotEmpty()
+                .hasSize(1);
+
+        assertThat(secondRow.getFirst().getText())
+                .isEqualTo(StartStopBotOption.STOP_BOT.getTitle());
+
+        assertThat(secondRow.getFirst().getCallbackData())
+                .isEqualTo(StartStopBotOption.STOP_BOT.getTitle());
     }
 
     @Test
@@ -120,27 +153,27 @@ class VacancyTrackerKeyboardFactoryTest {
         InlineKeyboardMarkup settingKeyboard = keyboardFactory.createSettingKeyboard();
         assertThat(settingKeyboard.getKeyboard())
                 .isNotEmpty()
-                .hasSize(6);
+                .hasSize(8);
 
         InlineKeyboardRow firstRow = settingKeyboard.getKeyboard().getFirst();
 
         assertThat(firstRow.getFirst().getText())
                 .isNotNull()
-                .isEqualTo(SettingOptions.REGION.getTitle());
+                .isEqualTo(SettingOptions.UTC_OPTION.getTitle());
 
         assertThat(firstRow.getFirst().getCallbackData())
                 .isNotNull()
-                .isEqualTo(CallbackPrefixes.SETTING_PREFIX + SettingOptions.REGION);
+                .isEqualTo(CallbackPrefixes.SETTING_PREFIX + SettingOptions.UTC_OPTION.getTitle());
 
         InlineKeyboardRow lastRow = settingKeyboard.getKeyboard().getLast();
 
         assertThat(lastRow.getFirst().getText())
                 .isNotNull()
-                .isEqualTo(ReadyAction.COMPLETE.getTitle());
+                .isEqualTo(OUT_IN_ROUTER.getTitle());
 
         assertThat(lastRow.getFirst().getCallbackData())
                 .isNotNull()
-                .isEqualTo(CallbackPrefixes.SETTING_PREFIX + ReadyAction.COMPLETE);
+                .isEqualTo(OUT_IN_ROUTER.getTitle());
     }
 
     @Test
@@ -165,11 +198,11 @@ class VacancyTrackerKeyboardFactoryTest {
                 .isEqualTo(ExperienceOption.WITHOUT_EXPERIENCE.getTitle());
 
         assertThat(lastRow.getFirst().getCallbackData())
-                .isEqualTo(CallbackPrefixes.EXPERIENCE_PREFIX + ExperienceOption.WITHOUT_EXPERIENCE);
+                .isEqualTo(CallbackPrefixes.EXPERIENCE_PREFIX + "0");
     }
 
     @Test
-    @DisplayName("Проверка корректного создания клавиатуры для установки фильтра опыта пользователя")
+    @DisplayName("Проверка корректного создания клавиатуры для установки фильтра зарплаты пользователя")
     void createSalaryKeyboard_shouldCreateSalaryKeyboardWithCorrectlyData() {
         InlineKeyboardMarkup salaryKeyboard = keyboardFactory.createSalaryKeyboard();
         assertThat(salaryKeyboard.getKeyboard())
@@ -190,7 +223,7 @@ class VacancyTrackerKeyboardFactoryTest {
                 .isEqualTo(SalaryOption.NOT_TAKE_SALARY.getTitle());
 
         assertThat(lastRow.getFirst().getCallbackData())
-                .isEqualTo(CallbackPrefixes.SALARY_PREFIX + SalaryOption.NOT_TAKE_SALARY);
+                .isEqualTo(CallbackPrefixes.SALARY_PREFIX + "0");
     }
 
     @Test
@@ -288,7 +321,7 @@ class VacancyTrackerKeyboardFactoryTest {
                 .isEqualTo("14:00");
 
         assertThat(firstRow.getFirst().getCallbackData())
-                .isEqualTo(CallbackPrefixes.NOTIFY_TIME_PREFIX + "1400");
+                .isEqualTo(CallbackPrefixes.NOTIFY_TIME_PREFIX + "14:00");
 
         InlineKeyboardRow lastRow = rows.getLast();
         assertThat(lastRow)
@@ -344,34 +377,38 @@ class VacancyTrackerKeyboardFactoryTest {
         InlineKeyboardMarkup readyKeyboard = keyboardFactory.createReadyKeyboard();
         assertThat(readyKeyboard.getKeyboard())
                 .isNotNull()
-                .hasSize(1);
+                .hasSize(2);
 
         InlineKeyboardRow row = readyKeyboard.getKeyboard().getFirst();
 
         assertThat(row.getFirst().getText())
-                .isEqualTo(StartStopOptions.START.getTitle());
+                .isEqualTo(COMPLETE.getTitle());
 
         assertThat(row.getFirst().getCallbackData())
-                .isEqualTo(CallbackPrefixes.READY_PREFIX + StartStopOptions.START);
+                .isEqualTo(CallbackPrefixes.READY_PREFIX + COMPLETE.getTitle());
 
     }
 
     @Test
-    @DisplayName("Проверка корректного создания клавиатуры для остановки планировщика")
-    void createStopKeyboard_shouldCreateStopKeyboardWithCorrectlyData() {
-        InlineKeyboardMarkup stopKeyboard = keyboardFactory.createStopKeyboard();
-        assertThat(stopKeyboard.getKeyboard())
+    @DisplayName("Проверка создания постоянной ReplyKeyboardMarkup с кнопкой завершения")
+    void createBotControlKeyboard_shouldCreateControlKeyboard_withStopButton() {
+        VacancyTrackerKeyboardFactory factory = new VacancyTrackerKeyboardFactory();
+
+        InlineKeyboardMarkup keyboard = factory.createBotStopKeyboard();
+
+        assertThat(keyboard.getKeyboard())
+                .hasSize(2);
+
+        String textFirstButton = keyboard.getKeyboard().getFirst().getFirst().getText();
+        String textSecondButton = keyboard.getKeyboard().getLast().getFirst().getText();
+
+        assertThat(textFirstButton)
                 .isNotNull()
-                .hasSize(1);
+                .isEqualTo(StartStopBotOption.STOP_BOT.getTitle());
 
-        InlineKeyboardRow row = stopKeyboard.getKeyboard().getFirst();
-
-        assertThat(row.getFirst().getText())
-                .isEqualTo("Остановить планировщик");
-
-        assertThat(row.getFirst().getCallbackData())
-                .isEqualTo("STOP:STOP");
-
+        assertThat(textSecondButton)
+                .isNotNull()
+                .isEqualTo(StartStopBotOption.OUT_IN_ROUTER.getTitle());
     }
 
     @Test

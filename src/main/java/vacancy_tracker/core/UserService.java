@@ -33,6 +33,7 @@ public class UserService {
         return repository.findById(userId).orElseGet(
                 () -> {
                     User newUser = new User(userId);
+                    newUser.updateUtcOffset(ZoneOffset.ofHours(3));
                     repository.saveUser(newUser);
                     return newUser;
                 }
@@ -179,6 +180,20 @@ public class UserService {
             throw new IllegalArgumentException("sessionState не может быть null");
         }
         sessionStates.put(userId, sessionState);
+    }
+
+    /**
+     * Удаляет пользователя из репозитория.
+     *
+     * @param userId ID пользователя для удаления
+     * @throws IllegalArgumentException если userId == null
+     */
+    public void deleteUser(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        getOrCreateUser(userId);
+        repository.deleteUser(userId);
     }
 
     /**

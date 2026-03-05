@@ -16,14 +16,21 @@ public final class VacancyMessages {
 
     public static final String AFTER_START_MESSAGE = """
             Vacancy Tracker Bot приветствует вас! 🙌
-            Для удобства в боте будет использоваться часовой пояс UTC 🌍""";
+            Для удобства в боте будет использоваться часовой пояс UTC +3(МСК) 🌍""";
 
     public static final String ENTER_UTC_OFFSET = """
-            ⏰ Введите смещение часового пояса в формате UTC.
+            ⏰ Выберите смещение часового пояса в формате UTC
+            или введите его вручную.
             Например: +07:00 или -11:30""";
 
     public static final String UPDATED_UTC_MESSAGE = """
             ✅ Смещение часового пояса успешно обновлено.""";
+
+    public static final String START_WHEN_ACTIVE_MESSAGE = """
+            ⚙️ В настоящий момент планировщик уже работает в фоновом режиме.
+            Если вы хотите остановить работу бота — нажмите кнопку «🛑 Завершить работу бота»
+            Или нажмите «Старт» для выбора новой конфигурации 🔁
+            """;
 
     public static final String REGION_MESSAGE = """
             📍 Выберите регион из списка или введите номер региона в виде целого числа.
@@ -47,14 +54,16 @@ public final class VacancyMessages {
             ✅ Минимальная ожидаемая зарплата для поиска вакансий обновлена.""";
 
     public static final String KEYWORD_MESSAGE = """
-            🔎 Введите ключевое слово для поиска соответствующих вакансий.
+            🔎 Выберите ключевое слово для поиска соответствующих вакансий
+            или введите свой вариант вручную.
             Например: Java Developer""";
 
     public static final String UPDATE_KEYWORD_MESSAGE = """
             ✅ Ключевое слово для поиска соответствующих вакансий обновлено.""";
 
     public static final String NOTIFY_TIME_MESSAGE = """
-            ⏰ Введите время нотификации (это обязательное поле).
+            ⏰ Выберите время нотификации (это обязательное поле)
+            или введите его вручную.
             Например: 13:35 или 18 55""";
 
     public static final String UPDATE_NOTIFY_TIME_MESSAGE = """
@@ -62,8 +71,7 @@ public final class VacancyMessages {
 
     public static final String READY_MESSAGE = """
             🎯 Настройки завершены!
-            Нажмите кнопку «Начать», чтобы запустить планировщик уведомлений,
-            или вернитесь в меню настроек 🔧""";
+            Нажмите кнопку «Запустить планировщик» или вернитесь в меню настроек 🔧""";
 
     public static final String READY_START_MESSAGE = """
             🚀 Планировщик запущен!
@@ -74,11 +82,25 @@ public final class VacancyMessages {
 
     public static final String STOP_MESSAGE = """
             ⛔ Вы уверены, что хотите остановить работу бота и удалить данные поиска?
-            Ответьте: Да или Нет""";
+            Нажмите: "✅ Подтвердить" или "❌ Отмена"
+            """;
+
+    public static final String HOME_MESSAGE_WHEN_CONFIGURING = """
+            ⛔ Вы уверены, что хотите выйти в главное меню?
+            (Вы не завершили настройку и запуск VacancyBot, ранее введённые данные будут удалены)
+            Нажмите: "✅ Подтвердить" или "❌ Отмена"
+            """;
+
+    public static final String HOME_MESSAGE_WHEN_ACTIVE = """
+            ✅ Планировщик работает в фоновом режиме, ожидайте уведомлений 😊""";
 
     public static final String SUCCESSFUL_STOP_MESSAGE = """
             ✅ Планировщик остановлен, данные поиска очищены.
             Спасибо, что пользовались VacancyTrackerBot! 🙏""";
+
+    public static final String SUCCESSFUL_HOME_MESSAGE = """
+            ✅ Настройки сброшены.
+            Вернулись в главное меню! 🏠""";
 
     public static final String CONTINUE_MESSAGE = """
             🙌 Отлично! Продолжаем пользоваться VacancyTrackerBot 😊""";
@@ -91,7 +113,7 @@ public final class VacancyMessages {
             Ожидается что-то вроде: +03:00, +03:30, -05:00""";
 
     public static final String ERROR_REGION_MESSAGE = """
-            ⚠️ Неверный формат ввода региона.
+            ⚠️ Неверный формат ввода региона. (доступны 85 регионов от 1 до 85)
             Введите целое число, например: 65, 77, 5""";
 
     public static final String ERROR_EXPERIENCE_MESSAGE = """
@@ -107,12 +129,13 @@ public final class VacancyMessages {
             Ожидается, например: 17:00 или 02 33""";
 
     public static final String ERROR_READY_MESSAGE = """
-            ⚠️ Похоже, был введён некорректный ответ.
-            Для старта нажмите кнопку «Начать» ниже.""";
+            ⚠️ Нельзя запустить планировщик: время уведомлений не задано.
+            Пожалуйста, сначала установите время нотификации в настройках.""";
 
     public static final String ERROR_STOP_MESSAGE = """
             ⚠️ Похоже, был введён некорректный ответ.
-            Выберите вариант на клавиатуре или напишите: Да или Нет.""";
+            Нажмите: "✅ Подтвердить" или "❌ Отмена"
+            """;
 
     public static final String UNKNOWN_MESSAGE = """
             🤔 Неизвестная команда.

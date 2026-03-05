@@ -12,5 +12,7 @@ public enum VacancyKeyboardKey {
     STOP_KEYBOARD,
     YES_OR_NO_KEYBOARD,
     START_KEYBOARD,
+    START_AND_STOP_KEYBOARD,
+    ROUTER_MENU_KEYBOARD,
     NONE
 }

@@ -8,8 +8,23 @@ public class UpdateMapper {
         if (update == null) {
             throw new IllegalArgumentException("update не может быть null");
         }
-        return new IncomingUpdateDto(
-                update.getMessage().getChatId(),
-                update.getMessage().getText());
+        
+        IncomingUpdateDto currentUpdate = null;
+        
+        if (update.hasMessage()) {
+            currentUpdate = new IncomingUpdateDto(
+                    update.getMessage().getChatId(),
+                    update.getMessage().getText()
+            );
+        }
+
+        if (update.hasCallbackQuery()) {
+            currentUpdate = new IncomingUpdateDto(
+                    update.getCallbackQuery().getMessage().getChatId(),
+                    update.getCallbackQuery().getData()
+            );
+        }
+        
+        return currentUpdate;
     }
 }

@@ -3,14 +3,25 @@ package vacancy_tracker.core;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import vacancy_tracker.bot.VacancySender;
 
 import java.time.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@ExtendWith(MockitoExtension.class)
 class ScheduledNotificationServiceTest {
 
+    @Mock
+    UserService userService;
+    @Mock
+    VacancySearchService vacancySearchService;
+    @Mock
+    VacancySender vacancySender;
     Long USER_ID = 11L;
     User user;
     UserSettings settings;
@@ -28,7 +39,9 @@ class ScheduledNotificationServiceTest {
                 LocalTime.of(11, 35)
         );
         user.updateSettings(settings);
-        notificationService = new ScheduledNotificationService();
+        notificationService = new ScheduledNotificationService(
+                userService, vacancySearchService, vacancySender
+        );
     }
 
     @Test
@@ -59,25 +72,13 @@ class ScheduledNotificationServiceTest {
 
     @Test
     @DisplayName("Проверка выброса исключений, когда userUtcOffset или notifyTine null")
-    void scheduleNotifications_shouldThrowsIllegalStateException_whenOffsetOrNotifyTimeIsNull() {
+    void scheduleNotifications_shouldThrowsIllegalStateException_whenNotifyTimeIsNull() {
         User userWithInvalidData = new User(17L);
-        assertThatThrownBy(() ->
-                notificationService.scheduleNotifications(userWithInvalidData))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Нельзя запланировать уведомления без utcOffset или notificationTime");
-
         userWithInvalidData.updateUtcOffset(ZoneOffset.ofHoursMinutes(8, 30));
         assertThatThrownBy(() ->
                 notificationService.scheduleNotifications(userWithInvalidData))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Нельзя запланировать уведомления без utcOffset или notificationTime");
-
-        userWithInvalidData.updateUtcOffset(null);
-        userWithInvalidData.updateNotificationTime(LocalTime.of(5, 50));
-        assertThatThrownBy(() ->
-                notificationService.scheduleNotifications(userWithInvalidData))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Нельзя запланировать уведомления без utcOffset или notificationTime");
+                .hasMessage("Нельзя запланировать уведомления без notificationTime");
     }
 
     @Test

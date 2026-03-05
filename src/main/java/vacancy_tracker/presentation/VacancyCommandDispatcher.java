@@ -1,8 +1,9 @@
 package vacancy_tracker.presentation;
 
 import markups.VacancyKeyboardKey;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import vacancy_tracker.bot.VacancyReply;
-import vacancy_tracker.bot.types.NavigationAction;
 import vacancy_tracker.bot.types.ReadyAction;
 import vacancy_tracker.core.*;
 import vacancy_tracker.presentation.dto.CommandType;
@@ -27,6 +28,7 @@ import static vacancy_tracker.bot.VacancyMessages.*;
  */
 public class VacancyCommandDispatcher {
 
+    private static final Logger log = LogManager.getLogger(VacancyCommandDispatcher.class);
     private final UserService userService;
     private final ScheduledNotificationService notificationService;
 
@@ -56,140 +58,182 @@ public class VacancyCommandDispatcher {
         Long userId = commandDto.userId();
         CommandType type = commandDto.commandType();
         String arguments = commandDto.arguments();
+        UserSettingState stateBefore = userService.getSettingState(userId);
 
-        switch (type) {
+        log.info("Handle command: userId={}, stateBefore={}, type={}, args='{}'",
+                userId, stateBefore, type, arguments);
+
+        VacancyReply reply = switch (type) {
             case START -> {
                 userService.getOrCreateUser(userId);
                 userService.updateSettingState(userId, UserSettingState.CLEAN);
-                return new VacancyReply(userId, AFTER_START_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
+                userService.setStateSession(userId, VacancySessionState.CONFIGURING);
+                yield new VacancyReply(userId, AFTER_START_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
             }
             case SET_UTC -> {
                 if (checkCurrentState(userId)) {
                     userService.updateSettingState(userId, UserSettingState.WAITING_SET_UTC);
-                    return new VacancyReply(userId, ENTER_UTC_OFFSET, VacancyKeyboardKey.UTC_KEYBOARD);
+                    yield new VacancyReply(userId, ENTER_UTC_OFFSET, VacancyKeyboardKey.UTC_KEYBOARD);
                 } else {
                     try {
                         ZoneOffset zone = ZoneOffset.of(arguments);
                         userService.updateUtcOffset(userId, zone);
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
-                        return new VacancyReply(userId, UPDATED_UTC_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
+                        yield new VacancyReply(userId, UPDATED_UTC_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
                     } catch (RuntimeException e) {
-                        return new VacancyReply(userId, ERROR_UTC_MESSAGE, VacancyKeyboardKey.UTC_KEYBOARD);
+                        yield new VacancyReply(userId, ERROR_UTC_MESSAGE, VacancyKeyboardKey.UTC_KEYBOARD);
                     }
                 }
             }
+            case CHANGE_UTC_PAGE -> new VacancyReply(userId, arguments, VacancyKeyboardKey.UTC_KEYBOARD);
             case SET_REGION -> {
                 if (checkCurrentState(userId)) {
                     userService.updateSettingState(userId, UserSettingState.WAITING_SET_REGION);
-                    return new VacancyReply(userId, REGION_MESSAGE, VacancyKeyboardKey.REGION_KEYBOARD);
+                    yield new VacancyReply(userId, REGION_MESSAGE, VacancyKeyboardKey.REGION_KEYBOARD);
                 } else {
                     try {
                         int regionCode = Integer.parseInt(arguments);
+                        validateRegion(regionCode);
                         userService.updateRegionCode(userId, regionCode);
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
-                        return new VacancyReply(userId, UPDATE_REGION_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
+                        yield new VacancyReply(userId, UPDATE_REGION_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
                     } catch (NumberFormatException e) {
-                        return new VacancyReply(userId, ERROR_REGION_MESSAGE, VacancyKeyboardKey.REGION_KEYBOARD);
+                        yield new VacancyReply(userId, ERROR_REGION_MESSAGE, VacancyKeyboardKey.REGION_KEYBOARD);
                     }
                 }
             }
+            case CHANGE_REGION_PAGE -> new VacancyReply(userId, arguments, VacancyKeyboardKey.REGION_KEYBOARD);
             case SET_MIN_EXPERIENCE -> {
                 if (checkCurrentState(userId)) {
                     userService.updateSettingState(userId, UserSettingState.WAITING_SET_MIN_EXPERIENCE);
-                    return new VacancyReply(userId, EXPERIENCE_MESSAGE, VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
+                    yield new VacancyReply(userId, EXPERIENCE_MESSAGE, VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
                 } else {
                     try {
                         int experienceFrom = Integer.parseInt(arguments);
+                        validateExperience(experienceFrom);
                         userService.updateExperienceFrom(userId, experienceFrom);
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
-                        return new VacancyReply(userId, UPDATE_EXPERIENCE_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
+                        yield new VacancyReply(userId, UPDATE_EXPERIENCE_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
                     } catch (NumberFormatException e) {
-                        return new VacancyReply(userId, ERROR_EXPERIENCE_MESSAGE, VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
+                        yield new VacancyReply(userId, ERROR_EXPERIENCE_MESSAGE, VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
                     }
                 }
             }
             case SET_MIN_SALARY -> {
                 if (checkCurrentState(userId)) {
                     userService.updateSettingState(userId, UserSettingState.WAITING_SET_MIN_SALARY);
-                    return new VacancyReply(userId, SALARY_MESSAGE, VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
+                    yield new VacancyReply(userId, SALARY_MESSAGE, VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
                 } else {
                     try {
                         int minSalary = Integer.parseInt(arguments);
+                        validateSalary(minSalary);
                         userService.updateSalaryFrom(userId, minSalary);
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
-                        return new VacancyReply(userId, UPDATE_SALARY_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
+                        yield new VacancyReply(userId, UPDATE_SALARY_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
                     } catch (NumberFormatException e) {
-                        return new VacancyReply(userId, ERROR_SALARY_MESSAGE, VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
+                        yield new VacancyReply(userId, ERROR_SALARY_MESSAGE, VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
                     }
                 }
             }
             case SET_KEYWORD -> {
                 if (checkCurrentState(userId)) {
                     userService.updateSettingState(userId, UserSettingState.WAITING_SET_KEYWORD);
-                    return new VacancyReply(userId, KEYWORD_MESSAGE, VacancyKeyboardKey.NONE);
+                    yield new VacancyReply(userId, KEYWORD_MESSAGE, VacancyKeyboardKey.KEY_WORD_KEYBOARD);
                 } else {
                     userService.updateWordForSearch(userId, arguments);
                     userService.updateSettingState(userId, UserSettingState.CLEAN);
-                    return new VacancyReply(userId, UPDATE_KEYWORD_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
+                    yield new VacancyReply(userId, UPDATE_KEYWORD_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
                 }
             }
             case SET_NOTIFY_TIME -> {
                 if (checkCurrentState(userId)) {
                     userService.updateSettingState(userId, UserSettingState.WAITING_SET_NOTIFY_TIME);
-                    return new VacancyReply(userId, NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
+                    yield new VacancyReply(userId, NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
                 } else {
                     try {
                         LocalTime time = parseNotificationTime(arguments);
                         userService.updateNotificationTime(userId, time);
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
-                        return new VacancyReply(userId, UPDATE_NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
+                        yield new VacancyReply(userId, UPDATE_NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
                     } catch (RuntimeException e) {
-                        return new VacancyReply(userId, ERROR_NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
+                        yield new VacancyReply(userId, ERROR_NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
                     }
                 }
             }
+            case CHANGE_NOTIFY_PAGE -> new VacancyReply(userId, arguments, VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
             case READY -> {
                 if (checkCurrentState(userId)) {
-                    userService.updateSettingState(userId, UserSettingState.WAITING_READY_COMMAND);
-                    return new VacancyReply(userId, READY_MESSAGE, VacancyKeyboardKey.READY_KEYBOARD);
+                    User user = userService.getOrCreateUser(userId);
+                    if (user.isSettingsReady()) {
+                        userService.updateSettingState(userId, UserSettingState.WAITING_READY_COMMAND);
+                        yield new VacancyReply(userId, READY_MESSAGE, VacancyKeyboardKey.READY_KEYBOARD);
+                    } else {
+                        yield new VacancyReply(userId, ERROR_READY_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
+                    }
                 } else {
                     if (ReadyAction.COMPLETE.getTitle().equals(arguments)) {
                         User user = userService.getOrCreateUser(userId);
                         userService.setStateSession(userId, VacancySessionState.ACTIVE);
                         notificationService.scheduleNotifications(user);
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
-                        return new VacancyReply(userId, READY_START_MESSAGE, VacancyKeyboardKey.STOP_KEYBOARD);
-                    } else if (NavigationAction.RETURN.getTitle().equals(arguments)) {
+                        yield new VacancyReply(userId, READY_START_MESSAGE, VacancyKeyboardKey.STOP_KEYBOARD);
+                    } else if (ReadyAction.GO_BACK.getTitle().equals(arguments)) {
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
-                        return new VacancyReply(userId, BACK_INTO_SETTINGS_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
+                        yield new VacancyReply(userId, BACK_INTO_SETTINGS_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
                     } else {
-                        return new VacancyReply(userId, ERROR_READY_MESSAGE, VacancyKeyboardKey.READY_KEYBOARD);
+                        yield new VacancyReply(userId, ERROR_READY_MESSAGE, VacancyKeyboardKey.READY_KEYBOARD);
                     }
                 }
             }
             case STOP -> {
                 if (checkCurrentState(userId)) {
                     userService.updateSettingState(userId, UserSettingState.WAITING_STOP_COMMAND);
-                    return new VacancyReply(userId, STOP_MESSAGE, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
+                    yield new VacancyReply(userId, STOP_MESSAGE, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
                 } else {
                     if (ReadyAction.YES.getTitle().equals(arguments)) {
                         userService.setStateSession(userId, VacancySessionState.INACTIVE);
                         notificationService.cancelNotifications(userId);
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
-                        return new VacancyReply(userId, SUCCESSFUL_STOP_MESSAGE, VacancyKeyboardKey.START_KEYBOARD);
+                        yield new VacancyReply(userId, SUCCESSFUL_STOP_MESSAGE, VacancyKeyboardKey.START_KEYBOARD);
                     } else if (ReadyAction.NO.getTitle().equals(arguments)) {
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
-                        return new VacancyReply(userId, CONTINUE_MESSAGE, VacancyKeyboardKey.STOP_KEYBOARD);
+                        yield new VacancyReply(userId, CONTINUE_MESSAGE, VacancyKeyboardKey.STOP_KEYBOARD);
                     } else {
-                        return new VacancyReply(userId, ERROR_STOP_MESSAGE, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
+                        yield new VacancyReply(userId, ERROR_STOP_MESSAGE, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
                     }
                 }
             }
-            case UNKNOWN -> {
-                return new VacancyReply(userId, UNKNOWN_MESSAGE, VacancyKeyboardKey.NONE);
+            case HOME -> {
+                if (checkCurrentState(userId)
+                        && userService.getStateSessionOrDefault(userId) == VacancySessionState.CONFIGURING) {
+                    userService.updateSettingState(userId, UserSettingState.WAITING_HOME_COMMAND);
+                    yield new VacancyReply(userId, HOME_MESSAGE_WHEN_CONFIGURING, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
+                } else if (checkCurrentState(userId)
+                        && userService.getStateSessionOrDefault(userId) == VacancySessionState.ACTIVE) {
+                    yield new VacancyReply(userId, HOME_MESSAGE_WHEN_ACTIVE, VacancyKeyboardKey.ROUTER_MENU_KEYBOARD);
+                } else {
+                    if (ReadyAction.YES.getTitle().equals(arguments)) {
+                        userService.setStateSession(userId, VacancySessionState.INACTIVE);
+                        notificationService.cancelNotifications(userId);
+                        userService.updateSettingState(userId, UserSettingState.CLEAN);
+                        userService.deleteUser(userId);
+                        yield new VacancyReply(userId, SUCCESSFUL_HOME_MESSAGE, VacancyKeyboardKey.ROUTER_MENU_KEYBOARD);
+                    } else if (ReadyAction.NO.getTitle().equals(arguments)) {
+                        userService.updateSettingState(userId, UserSettingState.CLEAN);
+                        yield new VacancyReply(userId, CONTINUE_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
+                    } else {
+                        yield new VacancyReply(userId, ERROR_STOP_MESSAGE, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
+                    }
+                }
             }
-            default -> throw new IllegalStateException("Неизвестная ошибка при обработке типа команды" + type);
-        }
+            case UNKNOWN -> new VacancyReply(userId, UNKNOWN_MESSAGE, VacancyKeyboardKey.NONE);
+        };
+
+        UserSettingState stateAfter = userService.getSettingState(userId);
+        log.info("Command handled: userId={}, stateAfter={}, replyKey={}, text='{}'",
+                userId, stateAfter, reply.keyboardKey(), reply.text());
+
+        return reply;
     }
 
     private LocalTime parseNotificationTime(String input) {
@@ -208,5 +252,23 @@ public class VacancyCommandDispatcher {
 
     private boolean checkCurrentState(Long userId) {
         return userService.getSettingState(userId) == UserSettingState.CLEAN;
+    }
+
+    private void validateRegion(int region) {
+        if (region < 1 || region > 85) {
+            throw new NumberFormatException("Регион вне диапазона 1-85");
+        }
+    }
+
+    private void validateExperience(int experience) {
+        if (experience < 0 || experience > 10) {
+            throw new NumberFormatException("Опыт работы вне диапазона 0-10");
+        }
+    }
+
+    private void validateSalary(int salary) {
+        if (salary < 0) {
+            throw new NumberFormatException("Зарплата имеет отрицательное значение");
+        }
     }
 }

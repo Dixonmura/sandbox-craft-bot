@@ -12,6 +12,5 @@ public class CallbackPrefixes {
     public static final String NOTIFY_TIME_PREFIX = "NOTIFY_TIME:";
     public static final String YES_OR_NO_PREFIX = "YES_OR_NO:";
     public static final String READY_PREFIX = "READY:";
-    public static final String STOP_PREFIX = "STOP:";
     public static final String SETTING_PREFIX = "SETTING:";
 }

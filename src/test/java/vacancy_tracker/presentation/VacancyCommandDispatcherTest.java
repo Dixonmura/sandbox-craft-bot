@@ -8,9 +8,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import vacancy_tracker.bot.VacancyReply;
-import vacancy_tracker.bot.types.NavigationAction;
 import vacancy_tracker.bot.types.ReadyAction;
-import vacancy_tracker.bot.types.StartBotOption;
+import vacancy_tracker.bot.types.StartStopBotOption;
 import vacancy_tracker.core.*;
 import vacancy_tracker.data.InMemoryUserRepository;
 import vacancy_tracker.presentation.dto.CommandType;
@@ -52,7 +51,7 @@ class VacancyCommandDispatcherTest {
     @DisplayName("Проверка диспетчера на возвращение соответствующего команде ответа")
     void commandDispatch_shouldReturnAppropriateAnswer_whenDataIsValid() {
         VacancyReply reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.START, StartBotOption.START_BOT.getTitle()));
+                new UserCommandDto(USER_ID, CommandType.START, StartStopBotOption.START_BOT.getTitle()));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
                 .containsExactly(USER_ID, AFTER_START_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
@@ -108,7 +107,7 @@ class VacancyCommandDispatcherTest {
         reply = dispatcher.commandDispatch(
                 new UserCommandDto(USER_ID, CommandType.SET_KEYWORD, ""));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, KEYWORD_MESSAGE, VacancyKeyboardKey.NONE);
+                .containsExactly(USER_ID, KEYWORD_MESSAGE, VacancyKeyboardKey.KEY_WORD_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_KEYWORD)).isTrue();
 
         reply = dispatcher.commandDispatch(
@@ -160,7 +159,7 @@ class VacancyCommandDispatcherTest {
         assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_READY_COMMAND)).isTrue();
 
         reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.READY, NavigationAction.RETURN.getTitle()));
+                new UserCommandDto(USER_ID, CommandType.READY, ReadyAction.GO_BACK.getTitle()));
         assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
                 .containsExactly(USER_ID, BACK_INTO_SETTINGS_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
         assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();

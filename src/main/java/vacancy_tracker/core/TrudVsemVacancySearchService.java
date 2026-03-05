@@ -81,7 +81,7 @@ public class TrudVsemVacancySearchService implements VacancySearchService {
     @Override
     public List<Vacancy> findVacancies(UserSettings userSettings) {
         if (userSettings == null) {
-            throw new IllegalArgumentException("userSettings is null");
+            throw new IllegalArgumentException("userSettings не может быть null");
         }
 
         List<Vacancy> result = new ArrayList<>();
@@ -246,4 +246,3 @@ public class TrudVsemVacancySearchService implements VacancySearchService {
         );
     }
 }
-

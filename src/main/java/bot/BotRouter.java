@@ -4,14 +4,20 @@ import bot.utils.ReplyUtils;
 import command.CommandDispatcher;
 import markups.PomodoroKeyboardFactory;
 import markups.VacancyKeyboardKey;
+import markups.VacancyTrackerKeyboardFactory;
 import movie_quiz.bot.BotReply;
 import movie_quiz.bot.MovieQuizBot;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import pomodoro.bot.PomodoroBot;
@@ -84,6 +90,59 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
             return;
         }
 
+        if (update.hasCallbackQuery()) {
+            Long callbackChatId = update.getCallbackQuery().getMessage().getChatId();
+            String data = update.getCallbackQuery().getData();
+
+            log.debug("CallbackQuery received: chatId={}, data='{}'", callbackChatId, data);
+
+            if (data.startsWith("start")) {
+                commandDispatcher.dispatch(data, adaptCallbackToMessage(update));
+
+                AnswerCallbackQuery ack = AnswerCallbackQuery.builder()
+                        .callbackQueryId(update.getCallbackQuery().getId())
+                        .build();
+                try {
+                    client.execute(ack);
+                } catch (TelegramApiException e) {
+                    log.error("Error sending vacancy callback reply: chatId={}", callbackChatId, e);
+                }
+                return;
+            }
+
+
+            VacancyReply reply = vacancyBot.handleAnswer(update);
+            SendMessage msg = ReplyUtils.sendMessageVacancy(reply);
+
+            InlineKeyboardMarkup inlineMarkup = null;
+            if (msg != null && msg.getReplyMarkup() instanceof InlineKeyboardMarkup m) {
+                inlineMarkup = m;
+            }
+
+            EditMessageText.EditMessageTextBuilder editBuilder = EditMessageText.builder()
+                    .chatId(callbackChatId)
+                    .messageId(update.getCallbackQuery().getMessage().getMessageId())
+                    .text(msg != null ? msg.getText() : "");
+
+            if (inlineMarkup != null) {
+                editBuilder.replyMarkup(inlineMarkup);
+            }
+
+            EditMessageText editMsg = editBuilder.build();
+
+            AnswerCallbackQuery ack = AnswerCallbackQuery.builder()
+                    .callbackQueryId(update.getCallbackQuery().getId())
+                    .build();
+            try {
+                client.execute(editMsg);
+                client.execute(ack);
+            } catch (TelegramApiException e) {
+                log.error("Error sending vacancy callback reply: chatId={}", callbackChatId, e);
+            }
+            return;
+        }
+
+
         if (!update.hasMessage() || !update.getMessage().hasText()) {
             log.debug("Пропуск обновления без текстового сообщения: updateId={}", update.getUpdateId());
             return;
@@ -94,6 +153,7 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
 
         if (messageText.startsWith("/")) {
             handleCommand(chatId, messageText, update);
+            return;
         }
 
         handlePlainMessage(chatId, messageText, update);
@@ -270,8 +330,14 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
             VacancyReply reply = vacancyBot.handleAnswer(update);
             SendMessage sendMessage = ReplyUtils.sendMessageVacancy(reply);
 
+            log.debug(
+                    "Vacancy handlePlainMessage: chatId={}, text='{}', keyboardKey='{}'",
+                    reply.userId(),
+                    reply.text(),
+                    reply.keyboardKey());
+
             try {
-                client.execute(sendMessage);
+                client.execute(sendVacancyReplyWithControlKeyboard(sendMessage, chatId));
             } catch (TelegramApiException e) {
                 log.error("Ошибка при отправке ответа VacancyBot в чат chatId={}", chatId, e);
             }
@@ -285,7 +351,7 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
             SendMessage message = ReplyUtils.sendMessageVacancy(reply);
 
             try {
-                client.execute(message);
+                client.execute(sendVacancyReplyWithControlKeyboard(message, chatId));
             } catch (TelegramApiException e) {
                 log.error("Не удалось отправить системное сообщение пользователю, chatId={}", chatId, e);
             }
@@ -302,5 +368,28 @@ public class BotRouter implements LongPollingSingleThreadUpdateConsumer, Pomodor
         } catch (TelegramApiException e) {
             log.error("Не удалось отправить системное сообщение пользователю, chatId={}", chatId, e);
         }
+    }
+
+    private SendMessage sendVacancyReplyWithControlKeyboard(SendMessage message, Long chatId) {
+        if (message == null) {
+            log.warn("ReplyUtils вернул null для VacancyBot, chatId={}", chatId);
+            return null;
+        }
+
+        return message;
+    }
+
+    private Update adaptCallbackToMessage(Update original) {
+        CallbackQuery cb = original.getCallbackQuery();
+        Message fakeMsg = new Message();
+
+        fakeMsg.setMessageId(cb.getMessage().getMessageId());
+        fakeMsg.setChat(cb.getMessage().getChat());
+        fakeMsg.setText(cb.getMessage().toString());
+        fakeMsg.setDate(cb.getMessage().getDate());
+
+        Update adapted = new Update();
+        adapted.setMessage(fakeMsg);
+        return adapted;
     }
 }

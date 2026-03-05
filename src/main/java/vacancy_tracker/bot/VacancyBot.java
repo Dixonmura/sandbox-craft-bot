@@ -13,6 +13,7 @@ import vacancy_tracker.presentation.dto.IncomingUpdateDto;
 import vacancy_tracker.presentation.dto.UserCommandDto;
 
 import static vacancy_tracker.bot.VacancyMessages.START_MESSAGE;
+import static vacancy_tracker.bot.VacancyMessages.START_WHEN_ACTIVE_MESSAGE;
 
 /**
  * Telegram-бот для настройки поиска вакансий и получения ежедневных уведомлений.
@@ -45,18 +46,19 @@ public class VacancyBot {
         String userName = from != null ? from.getUserName() : "unknown";
 
         log.info(
-                "Первый запуск Pomodoro-бота для пользователя chatId={}, firstName={}, userName={}",
+                "Первый запуск VacancyTracker-бота для пользователя chatId={}, firstName={}, userName={}",
                 chatId,
                 firstName,
                 userName);
 
-        userService.setStateSession(chatId, VacancySessionState.CONFIGURING);
-
-        return new VacancyReply(update.getMessage().getChatId(), START_MESSAGE, VacancyKeyboardKey.START_KEYBOARD);
+        if (userService.getStateSessionOrDefault(chatId) == VacancySessionState.ACTIVE) {
+            return new VacancyReply(update.getMessage().getChatId(), START_WHEN_ACTIVE_MESSAGE, VacancyKeyboardKey.START_AND_STOP_KEYBOARD);
+        } else {
+            return new VacancyReply(update.getMessage().getChatId(), START_MESSAGE, VacancyKeyboardKey.START_KEYBOARD);
+        }
     }
 
     public VacancyReply handleAnswer(Update update) {
-
         IncomingUpdateDto incoming = updateMapper.getUpdateDto(update);
         Long userId = incoming.userId();
         var state = userService.getSettingState(userId);

@@ -16,6 +16,7 @@ import java.time.LocalTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TrudVsemVacancySearchServiceTest {
 
@@ -111,6 +112,54 @@ class TrudVsemVacancySearchServiceTest {
     }
 
     @Test
+    @DisplayName("findVacancies: возвращает пустой список при статусе != 200")
+    void findVacancies_returnsEmpty_whenStatusNot200() throws Exception {
+        String badStatusJson = """
+        {
+            "status": "500",
+            "meta": {"total": 0, "count": 0},
+            "results": {"vacancies": []}
+        }
+        """;
+
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setBody(badStatusJson));
+
+        UserSettings settings = new UserSettings(78, 1, 50000, "Java", LocalTime.of(10, 0));
+
+        List<Vacancy> result = service.findVacancies(settings);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findVacancies: возвращает пустой список при HTTP 404")
+    void findVacancies_returnsEmpty_whenHttp404() {
+        mockWebServer.enqueue(new MockResponse().setResponseCode(404));
+
+        UserSettings settings = new UserSettings(78, 1, 50000, "Java", LocalTime.of(10, 0));
+
+        List<Vacancy> result = service.findVacancies(settings);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findVacancies: возвращает пустой список при malformed JSON")
+    void findVacancies_returnsEmpty_whenMalformedJson() {
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setBody("INVALID JSON {"));
+
+        UserSettings settings = new UserSettings(78, 1, 50000, "Java", LocalTime.of(10, 0));
+
+        List<Vacancy> result = service.findVacancies(settings);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
     @DisplayName("buildUrl: не добавляет region, experienceFrom и salaryFrom, когда они null")
     void buildUrl_shouldSkipNullNumericFilters_whenSettingsFieldsNull() {
         UserSettings settings = new UserSettings(
@@ -127,6 +176,46 @@ class TrudVsemVacancySearchServiceTest {
         assertThat(url.queryParameter("experienceFrom")).isNull();
         assertThat(url.queryParameter("salaryFrom")).isNull();
         assertThat(url.queryParameter("text")).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("findVacancies: НЕ падает на malformed region code")
+    void findVacancies_handlesMalformedRegionCode_withoutNpe() throws Exception {
+        String malformedRegionJson = """
+        {
+            "status": "200",
+            "meta": {"total": 1, "count": 1},
+            "results": {
+                "vacancies": [{
+                    "id": "456",
+                    "source": "trudvsem",
+                    "region": "INVALID_CODE",
+                    "company": {"name": "Test Company"},
+                    "salary": {"from": 50000},
+                    "job-name": "Test Job",
+                    "alternate_url": "https://trudvsem.ru/test"
+                }]
+            }
+        }
+        """;
+
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setBody(malformedRegionJson));
+
+        UserSettings settings = new UserSettings(78, 1, 50000, "Test", LocalTime.of(10, 0));
+
+        List<Vacancy> result = service.findVacancies(settings);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Проверка выброса исключения, если на вход, вместо UserSetting подаётся null")
+    void findVacancies_shouldThrowsIllegalArgumentException_whenUserSettingIsNull() {
+        assertThatThrownBy(() ->
+                service.findVacancies(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("userSettings не может быть null");
     }
 
     private String createValidTrudVsemJsonResponse() throws Exception {

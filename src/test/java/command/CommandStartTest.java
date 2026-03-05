@@ -14,6 +14,7 @@ import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
+import static command.CommandMessages.START_COMMAND_MESSAGE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -43,9 +44,7 @@ class CommandStartTest {
         SendMessage sendMessage = captor.getValue();
         assertThat(sendMessage.getChatId()).isEqualTo("11");
         assertThat(sendMessage.getText())
-                .contains("Помогаю выбрать, чем заняться")
-                .contains("отдохнуть — сыграй в кино‑квиз")
-                .contains("включить помидор‑таймер");
+                .contains(START_COMMAND_MESSAGE);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package command;
 
+import markups.BotRouterKeyboardFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -14,22 +15,8 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 public class CommandStart implements Command {
 
     private static final Logger log = LogManager.getLogger(CommandStart.class);
+    private final BotRouterKeyboardFactory factory = new BotRouterKeyboardFactory();
 
-    private final String startText = """
-            Я — бот‑роутер этого чата 🤖
-            Помогаю выбрать, чем заняться прямо сейчас:
-            
-            Хочешь сфокусироваться и меньше отвлекаться — запусти таймер по методу помидора 🍅
-            
-            Хочешь отдохнуть — сыграй в кино‑квиз по кадрам из фильмов 🎬
-            
-            Отправь:
-            
-            /startpomodoro — включить помидор‑таймер (циклы работа/отдых) ⏱️
-            
-            /playmoviequiz — сыграть в кино‑квиз с вариантами ответов 🍿
-            
-            Выбери режим, а дальше каждый бот возьмёт тебя за руку в своём сценарии ✋""";
 
     private final TelegramClient telegramClient;
 
@@ -59,7 +46,8 @@ public class CommandStart implements Command {
 
         SendMessage sendMessage = SendMessage.builder()
                 .chatId(chatId)
-                .text(startText)
+                .text(CommandMessages.START_COMMAND_MESSAGE)
+                .replyMarkup(factory.createMainMenuKeyboard())
                 .build();
 
         try {

@@ -10,5 +10,9 @@ public enum CommandType {
     SET_NOTIFY_TIME,
     READY,
     STOP,
+    HOME,
+    CHANGE_REGION_PAGE,
+    CHANGE_UTC_PAGE,
+    CHANGE_NOTIFY_PAGE,
     UNKNOWN
 }

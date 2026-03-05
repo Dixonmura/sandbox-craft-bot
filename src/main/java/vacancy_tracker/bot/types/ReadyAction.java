@@ -2,9 +2,10 @@ package vacancy_tracker.bot.types;
 
 public enum ReadyAction {
 
-    YES("Да"),
-    NO("Нет"),
-    COMPLETE("Начать");
+    YES("✅ Подтвердить"),
+    NO("❌ Отмена"),
+    GO_BACK("⬅️ Назад"),
+    COMPLETE("▶️ Запустить поиск");
 
     private final String title;
 
