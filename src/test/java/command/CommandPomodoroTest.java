@@ -1,6 +1,7 @@
 package command;
 
 import bot.utils.ReplyUtils;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedStatic;
@@ -21,28 +22,7 @@ import static org.mockito.Mockito.*;
 class CommandPomodoroTest {
 
     @Test
-    void execute_shouldReturn_whenUpdateIsNull() {
-        CommandPomodoro command = new CommandPomodoro(mock(TelegramClient.class), mock(PomodoroBot.class));
-
-        command.execute(null);
-    }
-
-    @Test
-    void execute_shouldReturn_whenUpdateHasNoMessage() {
-        TelegramClient telegramClient = mock(TelegramClient.class);
-        PomodoroBot pomodoroBot = mock(PomodoroBot.class);
-        CommandPomodoro command = new CommandPomodoro(telegramClient, pomodoroBot);
-
-        Update update = mock(Update.class);
-        when(update.hasMessage()).thenReturn(false);
-
-        command.execute(update);
-
-        verifyNoInteractions(telegramClient);
-        verifyNoInteractions(pomodoroBot);
-    }
-
-    @Test
+    @DisplayName("Проверка запуска Помодоро и отправки сообщения без фото")
     void execute_shouldStartPomodoroAndSendMessageWithoutPhoto_whenImagePathIsNull() throws TelegramApiException {
         TelegramClient telegramClient = mock(TelegramClient.class);
         PomodoroBot pomodoroBot = mock(PomodoroBot.class);
@@ -71,6 +51,7 @@ class CommandPomodoroTest {
     }
 
     @Test
+    @DisplayName("Проверка корректной отправки фото")
     void execute_shouldSendPhotoAndMessage_whenImagePathIsNotNull() throws TelegramApiException {
         TelegramClient telegramClient = mock(TelegramClient.class);
         PomodoroBot pomodoroBot = mock(PomodoroBot.class);
@@ -101,6 +82,31 @@ class CommandPomodoroTest {
     }
 
     @Test
+    @DisplayName("Проверка, что бот не падает, если вызван execute с null")
+    void execute_shouldReturn_whenUpdateIsNull() {
+        CommandPomodoro command = new CommandPomodoro(mock(TelegramClient.class), mock(PomodoroBot.class));
+
+        command.execute(null);
+    }
+
+    @Test
+    @DisplayName("Проверка, что бот не запускается и не падает, когда приходит обновление без сообщения")
+    void execute_shouldReturn_whenUpdateHasNoMessage() {
+        TelegramClient telegramClient = mock(TelegramClient.class);
+        PomodoroBot pomodoroBot = mock(PomodoroBot.class);
+        CommandPomodoro command = new CommandPomodoro(telegramClient, pomodoroBot);
+
+        Update update = mock(Update.class);
+        when(update.hasMessage()).thenReturn(false);
+
+        command.execute(update);
+
+        verifyNoInteractions(telegramClient);
+        verifyNoInteractions(pomodoroBot);
+    }
+
+    @Test
+    @DisplayName("Проверка защиты от выбрасывания исключения, когда в фото подаётся null")
     void execute_shouldHandleTelegramApiException() throws TelegramApiException {
         TelegramClient telegramClient = mock(TelegramClient.class);
         PomodoroBot pomodoroBot = mock(PomodoroBot.class);

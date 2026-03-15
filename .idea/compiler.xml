@@ -8,6 +8,7 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="MultiBot" />
+        <module name="sandbox-multi-bot" />
       </profile>
     </annotationProcessing>
   </component>

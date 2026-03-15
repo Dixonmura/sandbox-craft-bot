@@ -2,14 +2,14 @@ package pomodoro.bot;
 
 public final class PomodoroMessages {
 
+    private PomodoroMessages() {
+    }
+
     public static final String MESSAGE_WITHOUT_STATS = """
             ⏰ Сессия завершена!\s
             
             📊 Статистика ещё не накопилась — она появится после первого рабочего цикла 🍅
             Вернись и заверши его, тогда покажу крутой отчёт! 😊""";
-
-    private PomodoroMessages() {
-    }
 
     public static final String WELCOME_MESSAGE = """
             Метод «Помодоро» — это работа короткими рывками с паузами 🍅

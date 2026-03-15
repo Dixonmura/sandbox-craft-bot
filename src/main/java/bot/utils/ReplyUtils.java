@@ -1,7 +1,6 @@
 package bot.utils;
 
-import markups.MovieQuizKeyboardFactory;
-import markups.PomodoroKeyboardFactory;
+import markups.*;
 import movie_quiz.bot.BotReply;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -10,8 +9,11 @@ import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import pomodoro.bot.PomodoroReply;
+import vacancy_tracker.bot.VacancyReply;
 
 import java.io.InputStream;
+
+import static vacancy_tracker.bot.VacancyMessages.*;
 
 /**
  * Утилитарный класс для преобразования {@link BotReply}
@@ -23,6 +25,8 @@ public class ReplyUtils {
 
     private static final MovieQuizKeyboardFactory keyboardFactoryQuiz = new MovieQuizKeyboardFactory();
     private static final PomodoroKeyboardFactory keyboardFactoryPomodoro = new PomodoroKeyboardFactory();
+    private static final VacancyTrackerKeyboardFactory keyboardFactoryVacancyTracker = new VacancyTrackerKeyboardFactory();
+    private static final BotRouterKeyboardFactory keyboardFactoryRouter = new BotRouterKeyboardFactory();
     private static final Logger log = LogManager.getLogger(ReplyUtils.class);
 
     /**
@@ -198,5 +202,103 @@ public class ReplyUtils {
                 .text(reply.text())
                 .replyMarkup(keyboardFactoryPomodoro.createButtonsKeyboard())
                 .build();
+    }
+
+    /**
+     * Создаёт объект {@link SendMessage} на основе {@link VacancyReply}.
+     * <p>
+     * В качестве текста используется {@link VacancyReply#text()}, а идентификатор чата берётся из {@link VacancyReply#userId()}.
+     * Если {@link VacancyReply#keyboardKey()} не равен {@code null} и не равен {@link VacancyKeyboardKey#NONE},
+     * к сообщению добавляется соответствующая клавиатура из {@link VacancyTrackerKeyboardFactory}.
+     * Иначе сообщение отправляется без клавиатуры.
+     *
+     * @param reply доменный ответ бота с текстом и типом клавиатуры
+     * @return настроенный {@link SendMessage} или {@code null}, если reply равен {@code null}
+     */
+    public static SendMessage sendMessageVacancy(VacancyReply reply) {
+        if (reply == null) {
+            log.error("sendMessage вызван, когда VacancyReply null");
+            return null;
+        }
+
+        SendMessage.SendMessageBuilder builder = SendMessage.builder()
+                .chatId(reply.userId())
+                .text(reply.text());
+
+        VacancyKeyboardKey key = reply.keyboardKey();
+        if (key == null || key == VacancyKeyboardKey.NONE) {
+            return builder.build();
+        }
+
+
+        switch (key) {
+            case START_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createStartKeyboard());
+            case SETTING_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createSettingKeyboard());
+            case UTC_KEYBOARD -> {
+                try {
+                    int page = Integer.parseInt(reply.text());
+                    createPaginationText(reply, builder, page, ENTER_UTC_OFFSET);
+                    builder.replyMarkup(keyboardFactoryVacancyTracker.createUtcOffsetsKeyboard(page));
+                } catch (NumberFormatException e) {
+                    builder.replyMarkup(keyboardFactoryVacancyTracker.createUtcOffsetsKeyboard(0));
+                }
+            }
+            case REGION_KEYBOARD -> {
+                try {
+                    int page = Integer.parseInt(reply.text());
+                    createPaginationText(reply, builder, page, REGION_MESSAGE);
+                    builder.replyMarkup(keyboardFactoryVacancyTracker.createRegionKeyboard(page));
+                } catch (NumberFormatException e) {
+                    builder.replyMarkup(keyboardFactoryVacancyTracker.createRegionKeyboard(0));
+                }
+            }
+            case MIN_EXPERIENCE_KEYBOARD ->
+                    builder.replyMarkup(keyboardFactoryVacancyTracker.createExperienceKeyboard());
+            case MIN_SALARY_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createSalaryKeyboard());
+            case KEY_WORD_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createKeyWordKeyboard());
+            case NOTIFY_TIME_KEYBOARD -> {
+                try {
+                    int page = Integer.parseInt(reply.text());
+                    createPaginationText(reply, builder, page, NOTIFY_TIME_MESSAGE);
+                    builder.replyMarkup(keyboardFactoryVacancyTracker.createNotifyTimeKeyboard(page));
+                } catch (NumberFormatException e) {
+                    builder.replyMarkup(keyboardFactoryVacancyTracker.createNotifyTimeKeyboard(0));
+                }
+            }
+            case YES_OR_NO_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createYesOrNoKeyboard());
+            case READY_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createReadyKeyboard());
+            case STOP_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createBotStopKeyboard());
+            case ROUTER_MENU_KEYBOARD -> builder.replyMarkup(keyboardFactoryRouter.createMainMenuKeyboard());
+            case START_AND_STOP_KEYBOARD -> builder.replyMarkup(keyboardFactoryVacancyTracker.createStartAndStopKeyboard());
+            default -> log.warn("Неизвестный key: {}", key);
+        }
+
+        SendMessage message = builder.build();
+        log.info("Отправка Vacancy сообщения в чат chatId={}", reply.userId());
+        log.debug("Built vacancy message: userId={}, key={}, hasReplyMarkup={}, markupType={}",
+                reply.userId(), key, message.getReplyMarkup() != null,
+                message.getReplyMarkup() != null ? message.getReplyMarkup().getClass().getSimpleName() : "null");
+        return message;
+    }
+
+    private static void createPaginationText(
+            VacancyReply reply,
+            SendMessage.SendMessageBuilder builder,
+            int pageNum,
+            String baseMessage) {
+        StringBuilder paginationTextBuilder = new StringBuilder();
+
+        paginationTextBuilder
+                .append(baseMessage)
+                .append("\n")
+                .append("Стр. ");
+
+        if (reply.text() == null || reply.text().isBlank()) {
+            paginationTextBuilder.append("1");
+        } else {
+            paginationTextBuilder.append(pageNum + 1);
+        }
+
+        builder.text(paginationTextBuilder.toString());
     }
 }
