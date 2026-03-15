@@ -1,5 +1,6 @@
 package bot;
 
+import bot.utils.ReplyUtils;
 import command.CommandDispatcher;
 import markups.VacancyKeyboardKey;
 import movie_quiz.bot.BotReply;
@@ -8,297 +9,375 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentMatcher;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.chat.Chat;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import pomodoro.bot.PomodoroBot;
 import pomodoro.bot.PomodoroReply;
 import vacancy_tracker.bot.VacancyBot;
 import vacancy_tracker.bot.VacancyReply;
+import vacancy_tracker.bot.VacancyTelegramSender;
 
 import java.util.List;
 
-import static bot.RouterMessages.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class BotRouterTest {
 
-    private static final Long CHAT_ID = 33L;
-
     @Mock
-    TelegramClient telegramClient;
+    private TelegramClient client;
     @Mock
-    CommandDispatcher commandDispatcher;
+    private CommandDispatcher commandDispatcher;
     @Mock
-    MovieQuizBot movieQuizBot;
+    private MovieQuizBot movieQuizBot;
     @Mock
-    PomodoroBot pomodoroBot;
+    private PomodoroBot pomodoroBot;
     @Mock
-    VacancyBot vacancyBot;
+    private VacancyBot vacancyBot;
+    @Mock
+    private VacancyTelegramSender vacancySender;
 
     private BotRouter botRouter;
+    private final Long CHAT_ID = 123L;
+    private final Integer MESSAGE_ID = 456;
 
     @BeforeEach
     void setUp() {
-        botRouter = new BotRouter(telegramClient, commandDispatcher, movieQuizBot, pomodoroBot, vacancyBot);
+        botRouter = new BotRouter(client,
+                commandDispatcher,
+                movieQuizBot,
+                pomodoroBot,
+                vacancyBot,
+                vacancySender);
+    }
+
+    private Message createMessage(String text) {
+        Message message = new Message();
+        message.setChat(new Chat(CHAT_ID, "private"));
+        message.setText(text);
+        message.setMessageId(MESSAGE_ID);
+        return message;
+    }
+
+    private Update createTextUpdate(String text) {
+        Update update = new Update();
+        update.setMessage(createMessage(text));
+        return update;
+    }
+
+    private CallbackQuery createCallbackQuery(String data) {
+        CallbackQuery callback = new CallbackQuery();
+        callback.setId("callbackId");
+        callback.setData(data);
+
+        Message message = new Message();
+        message.setChat(new Chat(CHAT_ID, "private"));
+        message.setMessageId(MESSAGE_ID);
+        callback.setMessage(message);
+
+        return callback;
+    }
+
+    private Update createCallbackUpdate(String data) {
+        Update update = new Update();
+        update.setCallbackQuery(createCallbackQuery(data));
+        return update;
     }
 
     @Test
-    @DisplayName("команда с '/' делегируется в CommandDispatcher")
-    void consume_command_shouldDelegateToDispatcher() {
-        Update update = createUpdateWithText(CHAT_ID, "/playmoviequiz");
+    @DisplayName("Обновление без сообщения игнорируется")
+    void consume_shouldIgnoreUpdateWithoutMessage() {
+        Update update = new Update();
+        botRouter.consume(update);
+        verifyNoInteractions(client, commandDispatcher, movieQuizBot, pomodoroBot, vacancyBot);
+    }
+
+    @Test
+    @DisplayName("Callback с префиксом 'start' отправляется в CommandDispatcher")
+    void consume_callbackWithStart_shouldDispatchToCommandDispatcher() throws TelegramApiException {
+        Update update = createCallbackUpdate("start_pomodoro");
 
         botRouter.consume(update);
 
-        verify(commandDispatcher).dispatch("/playmoviequiz", update);
-        verifyNoMoreInteractions(commandDispatcher);
+        verify(commandDispatcher).dispatch(eq("start_pomodoro"), any(Update.class));
+        verify(client).execute(any(AnswerCallbackQuery.class));
     }
 
     @Test
-    @DisplayName("обычное сообщение без сессий отправляет системный ответ")
-    void consume_plainMessageWithoutSessions_shouldSendSystemMessage() throws Exception {
-        Update update = createUpdateWithText(CHAT_ID, "привет");
-
-        when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
-        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(false);
+    @DisplayName("Callback с префиксом 'vacancy_' отправляется в VacancyTelegramSender")
+    void consume_callbackWithVacancyPrefix_shouldHandlePagination() {
+        Update update = createCallbackUpdate("vacancy_next");
 
         botRouter.consume(update);
 
-        verify(telegramClient).execute(argThat((SendMessage msg) ->
-                msg.getChatId().equals(String.valueOf(CHAT_ID)) &&
-                        msg.getText().contains(COMMAND_UNDERSTAND_MESSAGE)));
+        verify(vacancySender).nextPage(CHAT_ID);
+        verifyNoInteractions(vacancyBot);
     }
 
     @Test
-    @DisplayName("сообщение при активной сессии квиза уходит в MovieQuizBot")
-    void consume_messageWithQuizSession_shouldForwardToMovieQuizBot() throws Exception {
-        Update update = createUpdateWithText(CHAT_ID, "ответ");
-        BotReply reply = new BotReply(
-                "text",
-                List.of("A", "B", "C", "D"),
-                false,
-                "img.png"
-        );
+    @DisplayName("Callback с префиксом 'vacancy_prev' отправляется в VacancyTelegramSender")
+    void consume_callbackWithVacancyPrev_shouldHandlePagination() {
+        Update update = createCallbackUpdate("vacancy_prev");
 
+        botRouter.consume(update);
+
+        verify(vacancySender).prevPage(CHAT_ID);
+    }
+
+    @Test
+    @DisplayName("Callback для VacancyBot обрабатывается и редактирует сообщение")
+    void consume_callbackForVacancyBot_shouldEditMessage() throws TelegramApiException {
+        Update update = createCallbackUpdate("SETTING:Регион");
+
+        VacancyReply vacancyReply = new VacancyReply(CHAT_ID, "Текст ответа", VacancyKeyboardKey.REGION_KEYBOARD);
+        when(vacancyBot.handleAnswer(update)).thenReturn(vacancyReply);
+
+        SendMessage sendMessage = mock(SendMessage.class);
+        when(sendMessage.getText()).thenReturn("Текст ответа");
+
+        InlineKeyboardMarkup keyboard = mock(InlineKeyboardMarkup.class);
+        when(sendMessage.getReplyMarkup()).thenReturn(keyboard);
+
+        try (MockedStatic<ReplyUtils> replyUtils = mockStatic(ReplyUtils.class)) {
+            replyUtils.when(() -> ReplyUtils.sendMessageVacancy(vacancyReply)).thenReturn(sendMessage);
+
+            botRouter.consume(update);
+
+            ArgumentCaptor<EditMessageText> editCaptor = ArgumentCaptor.forClass(EditMessageText.class);
+            verify(client).execute(editCaptor.capture());
+            verify(client).execute(any(AnswerCallbackQuery.class));
+
+            EditMessageText editMsg = editCaptor.getValue();
+            assertThat(editMsg.getChatId()).isEqualTo(CHAT_ID.toString());
+            assertThat(editMsg.getMessageId()).isEqualTo(MESSAGE_ID);
+            assertThat(editMsg.getText()).isEqualTo("Текст ответа");
+        }
+    }
+
+    @Test
+    @DisplayName("Команда /start отправляется в CommandDispatcher")
+    void consume_command_shouldDispatchToCommandDispatcher() {
+        Update update = createTextUpdate("/start");
+
+        botRouter.consume(update);
+
+        verify(commandDispatcher).dispatch("/start", update);
+    }
+
+    @Test
+    @DisplayName("Команда игнорируется при активном MovieQuiz")
+    void consume_command_shouldIgnore_whenMovieQuizActive() throws TelegramApiException {
         when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(true);
-        when(movieQuizBot.handleAnswer(update)).thenReturn(reply);
+        Update update = createTextUpdate("/start");
 
         botRouter.consume(update);
 
-        verify(movieQuizBot).handleAnswer(update);
-        verify(telegramClient).execute(any(SendMessage.class));
+        verify(commandDispatcher, never()).dispatch(anyString(), any());
+        verify(client).execute(any(SendMessage.class));
     }
 
     @Test
-    @DisplayName("при состоянии CONFIGURING сообщение обрабатывает VacancyBot.handleAnswer")
-    void consume_shouldCallVacancyBotHandleAnswer_whenVacancyBotIsConfiguring() throws Exception {
-        Update update = createUpdateWithText(CHAT_ID, "ответ");
-        VacancyReply reply = new VacancyReply(CHAT_ID, "Текст", VacancyKeyboardKey.SETTING_KEYBOARD);
+    @DisplayName("Команда игнорируется при активном Pomodoro")
+    void consume_command_shouldIgnore_whenPomodoroActive() throws TelegramApiException {
+        when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
+        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(true);
+        Update update = createTextUpdate("/start");
 
+        botRouter.consume(update);
+
+        verify(commandDispatcher, never()).dispatch(anyString(), any());
+        verify(client).execute(any(SendMessage.class));
+    }
+
+    @Test
+    @DisplayName("Команда игнорируется при настройке VacancyBot")
+    void consume_command_shouldIgnore_whenVacancyConfiguring() throws TelegramApiException {
         when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
         when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(false);
         when(vacancyBot.isConfiguring(CHAT_ID)).thenReturn(true);
-        when(vacancyBot.handleAnswer(update)).thenReturn(reply);
+        Update update = createTextUpdate("/start");
 
         botRouter.consume(update);
 
-        verify(vacancyBot).handleAnswer(update);
-        verify(telegramClient).execute(any(SendMessage.class));
+        verify(commandDispatcher, never()).dispatch(anyString(), any());
+        verify(client).execute(any(SendMessage.class));
     }
 
+    @Test
+    @DisplayName("Обычное сообщение при активном MovieQuiz отправляется в MovieQuizBot")
+    void consume_plainMessage_shouldHandleMovieQuiz() throws TelegramApiException {
+        when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(true);
+        Update update = createTextUpdate("Ответ на вопрос");
+
+        BotReply botReply = new BotReply("Текст ответа", List.of("1", "2", "3", "4"), false, "image.jpg");
+        when(movieQuizBot.handleAnswer(update)).thenReturn(botReply);
+
+        SendPhoto sendPhoto = mock(SendPhoto.class);
+        SendMessage sendMessage = mock(SendMessage.class);
+
+        try (MockedStatic<ReplyUtils> replyUtils = mockStatic(ReplyUtils.class)) {
+            replyUtils.when(() -> ReplyUtils.sendPhotoQuiz(eq(botReply), eq(CHAT_ID), any())).thenReturn(sendPhoto);
+            replyUtils.when(() -> ReplyUtils.sendMessageQuiz(botReply, CHAT_ID)).thenReturn(sendMessage);
+
+            botRouter.consume(update);
+
+            verify(client).execute(any(SendPhoto.class));
+            verify(client).execute(any(SendMessage.class));
+        }
+    }
 
     @Test
-    @DisplayName("при состоянии ACTIVE отправляется системное сообщение о запущенном планировщике")
-    void consume_shouldSendPlannerActiveMessage_whenVacancyBotIsActive() throws Exception {
-        Update update = createUpdateWithText(CHAT_ID, "ответ");
+    @DisplayName("Обычное сообщение при активном Pomodoro отправляется в PomodoroBot")
+    void consume_plainMessage_shouldHandlePomodoro() throws TelegramApiException {
+        when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
+        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(true);
+        Update update = createTextUpdate("Старт");
 
+        PomodoroReply pomodoroReply = new PomodoroReply("Текст ответа", "image.jpg", false);
+        when(pomodoroBot.handleAnswer(update)).thenReturn(pomodoroReply);
+
+        SendPhoto sendPhoto = mock(SendPhoto.class);
+        SendMessage sendMessage = mock(SendMessage.class);
+        when(sendMessage.getText()).thenReturn("Текст ответа");
+
+        try (MockedStatic<ReplyUtils> replyUtils = mockStatic(ReplyUtils.class)) {
+            replyUtils.when(() -> ReplyUtils.sendPhotoPomodoro(eq(pomodoroReply), eq(CHAT_ID), any())).thenReturn(sendPhoto);
+            replyUtils.when(() -> ReplyUtils.sendMessagePomodoro(pomodoroReply, CHAT_ID)).thenReturn(sendMessage);
+
+            botRouter.consume(update);
+
+            verify(client).execute(any(SendPhoto.class));
+            verify(client).execute(any(SendMessage.class));
+        }
+    }
+
+    @Test
+    @DisplayName("Обычное сообщение при настройке VacancyBot отправляется в VacancyBot")
+    void consume_plainMessage_shouldHandleVacancyConfiguring() throws TelegramApiException {
+        when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
+        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(false);
+        when(vacancyBot.isConfiguring(CHAT_ID)).thenReturn(true);
+        Update update = createTextUpdate("Москва");
+
+        VacancyReply vacancyReply = new VacancyReply(CHAT_ID, "Регион обновлён", VacancyKeyboardKey.SETTING_KEYBOARD);
+        when(vacancyBot.handleAnswer(update)).thenReturn(vacancyReply);
+
+        SendMessage sendMessage = mock(SendMessage.class);
+
+        try (MockedStatic<ReplyUtils> replyUtils = mockStatic(ReplyUtils.class)) {
+            replyUtils.when(() -> ReplyUtils.sendMessageVacancy(vacancyReply)).thenReturn(sendMessage);
+
+            botRouter.consume(update);
+
+            verify(client).execute(any(SendMessage.class));
+        }
+    }
+
+    @Test
+    @DisplayName("Обычное сообщение при активном VacancyBot отправляет сообщение о работе")
+    void consume_plainMessage_shouldHandleVacancyActive() throws TelegramApiException {
         when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
         when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(false);
         when(vacancyBot.isConfiguring(CHAT_ID)).thenReturn(false);
         when(vacancyBot.isActive(CHAT_ID)).thenReturn(true);
+        Update update = createTextUpdate("Что-то");
 
-        botRouter.consume(update);
+        try (MockedStatic<ReplyUtils> replyUtils = mockStatic(ReplyUtils.class)) {
+            replyUtils.when(() -> ReplyUtils.sendMessageVacancy(any(VacancyReply.class)))
+                    .thenReturn(mock(SendMessage.class));
 
-        verify(vacancyBot, never()).handleAnswer(update);
-        verify(telegramClient).execute(any(SendMessage.class));
-    }
+            botRouter.consume(update);
 
-
-    @Test
-    @DisplayName("сообщение при активной Pomodoro-сессии уходит в PomodoroBot")
-    void consume_messageWithPomodoroSession_shouldForwardToPomodoroBot() throws Exception {
-        Update update = createUpdateWithText(CHAT_ID, "Старт");
-        PomodoroReply reply = new PomodoroReply("text", "img.png", false);
-
-        when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
-        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(true);
-        when(pomodoroBot.handleAnswer(update)).thenReturn(reply);
-
-        botRouter.consume(update);
-
-        verify(pomodoroBot).handleAnswer(update);
-        verify(telegramClient).execute(any(SendMessage.class));
+            verify(vacancyBot, never()).handleAnswer(any());
+            verify(client).execute(any(SendMessage.class));
+        }
     }
 
     @Test
-    @DisplayName("sendPomodoroReply отправляет сообщение")
-    void sendPomodoroReply_shouldSendMessage() throws Exception {
-        PomodoroReply reply = new PomodoroReply("text", "img.png", false);
-
-        botRouter.sendPomodoroReply(CHAT_ID, reply);
-
-        verify(telegramClient).execute(any(SendMessage.class));
-    }
-
-    @Test
-    @DisplayName("Проверка отработки условия невозможности запуска двух ботов одновременно")
-    void createAnyBot_shouldCreateOnlyOneBot_whenUserCallOtherBot() throws TelegramApiException {
-        when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(true);
-        botRouter.consume(createUpdateWithText(CHAT_ID, "/startpomodoro"));
-
-        ArgumentMatcher<SendMessage> twoBotsWarning = msg ->
-                msg != null
-                        && CHAT_ID.toString().equals(msg.getChatId())
-                        && msg.getText() != null
-                        && msg.getText().contains(QUIZ_IS_ACTIVE);
-
-        verify(telegramClient, atLeastOnce())
-                .execute(argThat(twoBotsWarning));
-    }
-
-    @Test
-    @DisplayName("Проверка отработки условия невозможности запуска двух ботов одновременно")
-    void createAnyBot_shouldCreateOnlyOneBot_whenPomodoroBotSessionIsExist() throws TelegramApiException {
+    @DisplayName("Обычное сообщение без активных сессий отправляет подсказку")
+    void consume_plainMessage_shouldSendHint() throws TelegramApiException {
         when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
         when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(false);
-        when(vacancyBot.isConfiguring(CHAT_ID)).thenReturn(true);
-        botRouter.consume(createUpdateWithText(CHAT_ID, "/playmoviequiz"));
-
-        ArgumentMatcher<SendMessage> twoBotsWarning = msg ->
-                msg != null
-                        && CHAT_ID.toString().equals(msg.getChatId())
-                        && msg.getText() != null
-                        && msg.getText().contains(VACANCY_IS_CONFIGURE);
-
-        verify(telegramClient, atLeastOnce())
-                .execute(argThat(twoBotsWarning));
-    }
-
-    @Test
-    @DisplayName("проверка раннего выхода из consume, когда на вход подается null")
-    void consume_nullUpdate_shouldReturnWithoutInteractions() {
-        botRouter.consume((Update) null);
-
-        verifyNoInteractions(telegramClient, commandDispatcher, movieQuizBot, pomodoroBot);
-    }
-
-    @Test
-    @DisplayName("Проверка раннего выхода, когда в consume приходит обновление без сообщения")
-    void consume_updateWithoutMessage_shouldReturn() {
-        Update update = new Update();
-        botRouter.consume(update);
-
-        verifyNoInteractions(telegramClient, commandDispatcher, movieQuizBot, pomodoroBot);
-    }
-
-    @Test
-    @DisplayName("Pomodoro: при TelegramApiException отправляется fallback")
-    void consume_pomodoroReply_shouldSendFallbackOnTelegramException() throws Exception {
-        Update update = createUpdateWithText(CHAT_ID, "ответ");
-        PomodoroReply reply = new PomodoroReply("text", "img.png", false);
-
-        when(pomodoroBot.hasSession(CHAT_ID)).thenReturn(true);
-        when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(false);
-        when(pomodoroBot.handleAnswer(update)).thenReturn(reply);
-
-        doThrow(new TelegramApiException("fall"))
-                .when(telegramClient)
-                .execute(any(SendMessage.class));
+        when(vacancyBot.isConfiguring(CHAT_ID)).thenReturn(false);
+        when(vacancyBot.isActive(CHAT_ID)).thenReturn(false);
+        Update update = createTextUpdate("Привет");
 
         botRouter.consume(update);
 
-        verify(telegramClient, times(2)).execute(any(SendMessage.class));
+        ArgumentCaptor<SendMessage> messageCaptor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(client).execute(messageCaptor.capture());
 
-        verify(telegramClient).execute(argThat((SendMessage msg) ->
-                msg.getChatId().equals(CHAT_ID.toString())
-                        && msg.getText() != null
-                        && msg.getText().contains("(⚠️ Мотивашку с картинкой отправить не удалось"))
-        );
+        SendMessage sentMessage = messageCaptor.getValue();
+        assertThat(sentMessage.getChatId()).isEqualTo(CHAT_ID.toString());
+        assertThat(sentMessage.getText()).isEqualTo(RouterMessages.COMMAND_UNDERSTAND_MESSAGE);
     }
 
     @Test
-    @DisplayName("MovieQuiz: при TelegramApiException отправляется fallback")
-    void consume_BotReply_shouldSendFallbackOnTelegramException() throws Exception {
-        Update update = createUpdateWithText(CHAT_ID, "ответ");
-        BotReply reply = new BotReply("text", List.of("1", "2", "3", "4"), false, ".img");
+    @DisplayName("sendPomodoroReply отправляет сообщение и фото")
+    void sendPomodoroReply_shouldSendPhotoAndMessage() throws TelegramApiException {
+        PomodoroReply reply = new PomodoroReply("Текст", "image.jpg", false);
 
-        when(movieQuizBot.hasSession(CHAT_ID)).thenReturn(true);
-        when(movieQuizBot.handleAnswer(update)).thenReturn(reply);
+        SendPhoto sendPhoto = mock(SendPhoto.class);
+        SendMessage sendMessage = mock(SendMessage.class);
+        when(sendMessage.getText()).thenReturn("Текст");
 
-        doThrow(new TelegramApiException("fall"))
-                .when(telegramClient)
-                .execute(any(SendMessage.class));
+        try (MockedStatic<ReplyUtils> replyUtils = mockStatic(ReplyUtils.class)) {
+            replyUtils.when(() -> ReplyUtils.sendPhotoPomodoro(eq(reply), eq(CHAT_ID), any())).thenReturn(sendPhoto);
+            replyUtils.when(() -> ReplyUtils.sendMessagePomodoro(reply, CHAT_ID)).thenReturn(sendMessage);
 
-        botRouter.consume(update);
+            botRouter.sendPomodoroReply(CHAT_ID, reply);
 
-        verify(telegramClient, times(2)).execute(any(SendMessage.class));
-
-        verify(telegramClient).execute(argThat((SendMessage msg) ->
-                msg.getChatId().equals(CHAT_ID.toString())
-                        && msg.getText() != null
-                        && msg.getText().contains("⚠️ Картинку отправить не удалось из-за ошибки соединения."))
-        );
+            verify(client).execute(any(SendPhoto.class));
+            verify(client).execute(any(SendMessage.class));
+        }
     }
 
     @Test
-    @DisplayName("pomodoroBot: при TelegramApiException отправляется fallback")
-    void consume_PomodoroReply_shouldSendFallbackOnTelegramException() throws Exception {
-        Update update = createUpdateWithText(CHAT_ID, "ответ");
-        PomodoroReply reply = new PomodoroReply("text", "path", false);
+    @DisplayName("sendPomodoroReply отправляет только сообщение если нет фото")
+    void sendPomodoroReply_shouldSendOnlyMessage_whenNoImage() throws TelegramApiException {
+        PomodoroReply reply = new PomodoroReply("Текст", null, false);
 
-        doThrow(new TelegramApiException("fall"))
-                .when(telegramClient)
-                .execute(any(SendMessage.class));
+        SendMessage sendMessage = mock(SendMessage.class);
+        when(sendMessage.getText()).thenReturn("Текст");
 
-        botRouter.sendPomodoroReply(CHAT_ID, reply);
+        try (MockedStatic<ReplyUtils> replyUtils = mockStatic(ReplyUtils.class)) {
+            replyUtils.when(() -> ReplyUtils.sendMessagePomodoro(reply, CHAT_ID)).thenReturn(sendMessage);
 
-        verify(telegramClient, times(2)).execute(any(SendMessage.class));
+            botRouter.sendPomodoroReply(CHAT_ID, reply);
 
-        verify(telegramClient).execute(argThat((SendMessage msg) ->
-                msg.getChatId().equals(CHAT_ID.toString())
-                        && msg.getText() != null
-                        && msg.getText().contains("⚠️ Мотивашку с картинкой отправить не удалось из-за ошибки"))
-        );
+            verify(client).execute(any(SendMessage.class));
+            verify(client, never()).execute(any(SendPhoto.class));
+        }
     }
 
     @Test
-    @DisplayName("проверка отправки сообщения через метод sendFinalStatsQuestion")
-    void sendFinalStatsQuestion_shouldSendMessage() throws TelegramApiException {
-        botRouter.sendFinalStatsQuestion(CHAT_ID, "final Text");
+    @DisplayName("sendFinalStatsQuestion отправляет вопрос со статистикой")
+    void sendFinalStatsQuestion_shouldSendQuestion() throws TelegramApiException {
+        String question = "Хотите статистику?";
 
-        verify(telegramClient, times(1)).execute(any(SendMessage.class));
-        verify(telegramClient).execute(argThat((SendMessage msg) ->
-                msg.getChatId().equals(CHAT_ID.toString())
-                        && msg.getText().contains("final")
-                        && msg.getReplyMarkup() != null
-        ));
-    }
+        botRouter.sendFinalStatsQuestion(CHAT_ID, question);
 
-    private static Update createUpdateWithText(Long chatId, String text) {
-        Update update = new Update();
-        Message message = new Message();
-        Chat chat = new Chat(chatId, "");
-        message.setChat(chat);
-        message.setText(text);
-        update.setMessage(message);
-        return update;
+        ArgumentCaptor<SendMessage> messageCaptor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(client).execute(messageCaptor.capture());
+
+        SendMessage sentMessage = messageCaptor.getValue();
+        assertThat(sentMessage.getChatId()).isEqualTo(CHAT_ID.toString());
+        assertThat(sentMessage.getText()).isEqualTo(question);
+        assertThat(sentMessage.getReplyMarkup()).isNotNull();
     }
 }

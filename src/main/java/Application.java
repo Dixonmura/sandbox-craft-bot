@@ -11,10 +11,11 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import vacancy_tracker.bot.VacancyBot;
 import vacancy_tracker.bot.VacancyTelegramSender;
 import vacancy_tracker.core.ScheduledNotificationService;
-import vacancy_tracker.core.TrudVsemVacancySearchService;
+import vacancy_tracker.api.trudvsem.TrudVsemVacancySearchService;
 import vacancy_tracker.core.UserService;
 import vacancy_tracker.core.VacancySearchService;
-import vacancy_tracker.data.InMemoryUserRepository;
+import vacancy_tracker.data.json.JsonSessionStateRepository;
+import vacancy_tracker.data.json.JsonUserRepository;
 import vacancy_tracker.presentation.UpdateMapper;
 import vacancy_tracker.presentation.UserCommandParser;
 import vacancy_tracker.presentation.VacancyCommandDispatcher;
@@ -36,11 +37,17 @@ public class Application {
                 .build();
         TelegramClient telegramClient = new OkHttpTelegramClient(mapper, myClient, token.botToken(), url);
 
-        UserService userService = new UserService(new InMemoryUserRepository());
+        VacancyTelegramSender vacancySender = new VacancyTelegramSender(telegramClient);
+        JsonUserRepository userRepository = new JsonUserRepository();
+        JsonSessionStateRepository sessionStateRepository = new JsonSessionStateRepository();
+        UserService userService = new UserService(userRepository, sessionStateRepository);
         VacancySearchService vacancySearchService = new TrudVsemVacancySearchService(
-                myClient, mapper, "https://api.trudvsem.ru/");
+                myClient, mapper, "https://opendata.trudvsem.ru/api/v1/vacancies");
         ScheduledNotificationService notificationService = new ScheduledNotificationService(
-                userService, vacancySearchService, new VacancyTelegramSender(telegramClient));
+                userService,
+                userRepository,
+                vacancySearchService,
+                vacancySender);
 
         VacancyBot vacancyBot = new VacancyBot(
                 userService,
@@ -49,8 +56,9 @@ public class Application {
                 new VacancyCommandDispatcher(userService, notificationService));
 
         try (TelegramBotsLongPollingApplication botApplication = new TelegramBotsLongPollingApplication()) {
-            botApplication.registerBot(token.botToken(), new BotRouter(telegramClient, vacancyBot));
-            System.out.println("Бот запущен!");
+            botApplication.registerBot(token.botToken(), new BotRouter(telegramClient, vacancyBot, vacancySender));
+            System.out.println("✅ VacancyTrackerBot запущен!");
+            System.out.println("👋 Отправьте /start в Telegram, чтобы начать");
             Thread.currentThread().join();
         } catch (Exception e) {
             System.out.println(Arrays.toString(e.getStackTrace()));

@@ -163,7 +163,7 @@ public class VacancyTrackerKeyboardFactory {
             "DevOps Engineer");
 
     private final List<String> notifyTimelist = List.of(
-            "9:00",
+            "09:00",
             "10:00",
             "11:00",
             "12:00",

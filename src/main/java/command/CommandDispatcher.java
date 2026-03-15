@@ -1,6 +1,5 @@
 package command;
 
-import bot.RouterOptions;
 import movie_quiz.bot.MovieQuizBot;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -63,4 +62,3 @@ public class CommandDispatcher {
         }
     }
 }
-

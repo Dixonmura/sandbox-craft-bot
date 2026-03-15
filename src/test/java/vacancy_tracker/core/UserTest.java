@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 
@@ -50,6 +51,7 @@ class UserTest {
         user.updateUtcOffset(ZoneOffset.of("+02:20"));
         user.updateNotificationTime(LocalTime.of(3, 15));
         user.updateSettingState(UserSettingState.READY);
+        user.updateLastRequestTime(Instant.parse("2026-01-16T10:00:00Z"));
 
         assertThat(user.hasSettings()).isTrue();
         assertThat(user.isSettingsReady()).isTrue();
@@ -58,6 +60,7 @@ class UserTest {
         assertThat(user.getSettingState()).isEqualTo(UserSettingState.READY);
         assertThat(user.getSettings().getWordForSearch()).contains("C++");
         assertThat(user.getSettings().getNotificationTime()).isEqualTo(LocalTime.of(3, 15));
+        assertThat(user.getSettings().getLastRequestTime()).isEqualTo(Instant.parse("2026-01-16T10:00:00Z"));
     }
 
     @Test

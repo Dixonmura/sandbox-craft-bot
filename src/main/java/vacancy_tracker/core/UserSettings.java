@@ -2,6 +2,7 @@ package vacancy_tracker.core;
 
 import lombok.Getter;
 
+import java.time.Instant;
 import java.time.LocalTime;
 
 /**
@@ -16,6 +17,7 @@ public class UserSettings {
     private Integer salaryFrom;
     private String wordForSearch;
     private LocalTime notificationTime;
+    private Instant lastRequestTime;
 
     /**
      * Создает настройки пользователя с заданными параметрами.
@@ -56,6 +58,10 @@ public class UserSettings {
             throw new IllegalArgumentException("NotificationTime не может быть null");
         }
         this.notificationTime = notificationTime;
+    }
+
+    public void updateRequestTime(Instant lastRequestTime) {
+        this.lastRequestTime = lastRequestTime;
     }
 
     /**

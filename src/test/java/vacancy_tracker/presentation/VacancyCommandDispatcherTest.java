@@ -9,9 +9,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import vacancy_tracker.bot.VacancyReply;
 import vacancy_tracker.bot.types.ReadyAction;
-import vacancy_tracker.bot.types.StartStopBotOption;
 import vacancy_tracker.core.*;
-import vacancy_tracker.data.InMemoryUserRepository;
+import vacancy_tracker.data.json.JsonSessionStateRepository;
+import vacancy_tracker.data.json.JsonUserRepository;
+import vacancy_tracker.data.repository.SessionStateRepository;
+import vacancy_tracker.data.repository.UserRepository;
 import vacancy_tracker.presentation.dto.CommandType;
 import vacancy_tracker.presentation.dto.UserCommandDto;
 
@@ -27,286 +29,478 @@ import static vacancy_tracker.bot.VacancyMessages.*;
 @ExtendWith(MockitoExtension.class)
 class VacancyCommandDispatcherTest {
 
-    Long USER_ID = 18L;
-    UserRepository repository;
-    UserService userService;
-    VacancyCommandDispatcher dispatcher;
+    private final Long USER_ID = 18L;
+
+    private UserRepository userRepository;
+    private UserService userService;
+    private VacancyCommandDispatcher dispatcher;
+
     @Mock
-    ScheduledNotificationService notificationService;
+    private ScheduledNotificationService notificationService;
 
     @BeforeEach
     void setUp() {
-        repository = new InMemoryUserRepository();
-        userService = new UserService(repository);
+        userRepository = new JsonUserRepository();
+        SessionStateRepository sessionStateRepository = new JsonSessionStateRepository();
+        userService = new UserService(userRepository, sessionStateRepository);
         dispatcher = new VacancyCommandDispatcher(userService, notificationService);
-        userService.updateUserSettings(USER_ID, new UserSettings(
+
+        UserSettings settings = new UserSettings(
                 65,
                 3,
                 80000,
                 "Java developer",
-                LocalTime.parse("07:00")));
+                LocalTime.parse("07:00")
+        );
+        userService.updateUserSettings(USER_ID, settings);
+        userService.updateUtcOffset(USER_ID, ZoneOffset.ofHours(3));
+        userService.updateSettingState(USER_ID, UserSettingState.CLEAN);
+    }
+
+    private UserCommandDto createCommand(CommandType type, String args) {
+        return new UserCommandDto(USER_ID, type, args);
     }
 
     @Test
-    @DisplayName("Проверка диспетчера на возвращение соответствующего команде ответа")
-    void commandDispatch_shouldReturnAppropriateAnswer_whenDataIsValid() {
+    @DisplayName("START: устанавливает состояние CLEAN и клавиатуру настроек")
+    void start_shouldSetCleanStateAndSettingsKeyboard() {
+        VacancyReply reply = dispatcher.commandDispatch(createCommand(CommandType.START, ""));
+
+        assertThat(reply.userId()).isEqualTo(USER_ID);
+        assertThat(reply.text()).isEqualTo(AFTER_START_MESSAGE);
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.SETTING_KEYBOARD);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.CLEAN);
+        assertThat(userService.getStateSessionOrDefault(USER_ID))
+                .isEqualTo(VacancySessionState.CONFIGURING);
+    }
+
+    @Test
+    @DisplayName("SET_UTC: при CLEAN состоянии переводит в WAITING_SET_UTC")
+    void setUtc_whenClean_shouldSetWaitingState() {
+        VacancyReply reply = dispatcher.commandDispatch(createCommand(CommandType.SET_UTC, ""));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.UTC_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(ENTER_UTC_OFFSET);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.WAITING_SET_UTC);
+    }
+
+    @Test
+    @DisplayName("SET_UTC: с валидным аргументом обновляет часовой пояс")
+    void setUtc_withValidArg_shouldUpdateOffset() {
+
+        dispatcher.commandDispatch(createCommand(CommandType.SET_UTC, ""));
+
         VacancyReply reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.START, StartStopBotOption.START_BOT.getTitle()));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, AFTER_START_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
+                createCommand(CommandType.SET_UTC, "+05:30"));
 
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_UTC, ""));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, ENTER_UTC_OFFSET, VacancyKeyboardKey.UTC_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_UTC)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_UTC, "+05:30"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, UPDATED_UTC_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_REGION, ""));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, REGION_MESSAGE, VacancyKeyboardKey.REGION_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_REGION)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_REGION, "65"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, UPDATE_REGION_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_MIN_EXPERIENCE, ""));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, EXPERIENCE_MESSAGE, VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_MIN_EXPERIENCE)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_MIN_EXPERIENCE, "3"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, UPDATE_EXPERIENCE_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_MIN_SALARY, ""));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, SALARY_MESSAGE, VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_MIN_SALARY)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_MIN_SALARY, "90000"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, UPDATE_SALARY_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_KEYWORD, ""));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, KEYWORD_MESSAGE, VacancyKeyboardKey.KEY_WORD_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_KEYWORD)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_KEYWORD, "Java Developer"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, UPDATE_KEYWORD_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, ""));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_NOTIFY_TIME)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, "03:00"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, UPDATE_NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, ""));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_NOTIFY_TIME)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, "17 55"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, UPDATE_NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.READY, ""));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, READY_MESSAGE, VacancyKeyboardKey.READY_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_READY_COMMAND)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.READY, ReadyAction.COMPLETE.getTitle()));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, READY_START_MESSAGE, VacancyKeyboardKey.STOP_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.READY, ""));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, READY_MESSAGE, VacancyKeyboardKey.READY_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_READY_COMMAND)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.READY, ReadyAction.GO_BACK.getTitle()));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, BACK_INTO_SETTINGS_MESSAGE, VacancyKeyboardKey.SETTING_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.STOP, ""));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, STOP_MESSAGE, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_STOP_COMMAND)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.STOP, ReadyAction.YES.getTitle()));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, SUCCESSFUL_STOP_MESSAGE, VacancyKeyboardKey.START_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.STOP, ""));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, STOP_MESSAGE, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_STOP_COMMAND)).isTrue();
-
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.STOP, ReadyAction.NO.getTitle()));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, CONTINUE_MESSAGE, VacancyKeyboardKey.STOP_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.SETTING_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(UPDATED_UTC_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.CLEAN);
+        assertThat(userService.getOrCreateUser(USER_ID).getUtcOffset())
+                .isEqualTo(ZoneOffset.of("+05:30"));
     }
 
     @Test
-    @DisplayName("Проверка запуска планировщика и отмены задачи при соответствующей команде")
-    void checkNotificationService_shouldRunOrCloseTask_whenCallStartOrStop() {
-        userService.updateUtcOffset(USER_ID, ZoneOffset.ofHours(5));
-        dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.START, ""));
-        dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, ""));
-        dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, "18:00"));
-        dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.READY, ""));
-        dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.READY, ReadyAction.COMPLETE.getTitle()));
-        verify(notificationService, times(1)).scheduleNotifications(any(User.class));
+    @DisplayName("SET_UTC: с невалидным аргументом показывает ошибку")
+    void setUtc_withInvalidArg_shouldShowError() {
+        dispatcher.commandDispatch(createCommand(CommandType.SET_UTC, ""));
 
-        dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.STOP, ""));
-        dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.STOP, ReadyAction.YES.getTitle()));
-        verify(notificationService, times(1)).cancelNotifications(USER_ID);
-
-        verifyNoMoreInteractions(notificationService);
-    }
-
-    @Test
-    @DisplayName("Проверка диспетчера на некорректные команды")
-    void commandDispatch_shouldReturnUnknownTypeMessage_whenCommandTypeIsUnknown() {
-
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.SET_UTC, ""));
         VacancyReply reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_UTC, "27:46"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, ERROR_UTC_MESSAGE, VacancyKeyboardKey.UTC_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_UTC)).isTrue();
+                createCommand(CommandType.SET_UTC, "27:46"));
 
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.SET_REGION, ""));
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_REGION, "Сахалин"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, ERROR_REGION_MESSAGE, VacancyKeyboardKey.REGION_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_REGION)).isTrue();
-
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.SET_MIN_EXPERIENCE, ""));
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_MIN_EXPERIENCE, "Минимум"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, ERROR_EXPERIENCE_MESSAGE, VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_MIN_EXPERIENCE)).isTrue();
-
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.SET_MIN_SALARY, ""));
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_MIN_SALARY, "Много"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, ERROR_SALARY_MESSAGE, VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_MIN_SALARY)).isTrue();
-
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, ""));
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.SET_NOTIFY_TIME, "Где-то в обед"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, ERROR_NOTIFY_TIME_MESSAGE, VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_SET_NOTIFY_TIME)).isTrue();
-
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.READY, ""));
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.READY, "Ну поехали"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, ERROR_READY_MESSAGE, VacancyKeyboardKey.READY_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_READY_COMMAND)).isTrue();
-
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.STOP, ""));
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.STOP, "Сам не знаю"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, ERROR_STOP_MESSAGE, VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.WAITING_STOP_COMMAND)).isTrue();
-
-        dispatcher.commandDispatch(new UserCommandDto(USER_ID, CommandType.START, ""));
-        reply = dispatcher.commandDispatch(
-                new UserCommandDto(USER_ID, CommandType.UNKNOWN, "Привет бот"));
-        assertThat(reply).isNotNull().extracting(VacancyReply::userId, VacancyReply::text, VacancyReply::keyboardKey)
-                .containsExactly(USER_ID, UNKNOWN_MESSAGE, VacancyKeyboardKey.NONE);
-        assertThat(equalsCurrentSettingStateWith(UserSettingState.CLEAN)).isTrue();
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.UTC_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(ERROR_UTC_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.WAITING_SET_UTC);
     }
 
     @Test
-    @DisplayName("Проверка выброса исключения при создании экземпляра, когда userService null")
-    void constructor_shouldThrowsIllegalArgumentException_whenUserServiceIsNull() {
-        assertThatThrownBy(() ->
-                new VacancyCommandDispatcher(null, notificationService))
+    @DisplayName("CHANGE_UTC_PAGE: передаёт номер страницы")
+    void changeUtcPage_shouldPassPageNumber() {
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.CHANGE_UTC_PAGE, "2"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.UTC_KEYBOARD);
+        assertThat(reply.text()).isEqualTo("2");
+    }
+
+    @Test
+    @DisplayName("SET_REGION: при CLEAN состоянии переводит в WAITING_SET_REGION")
+    void setRegion_whenClean_shouldSetWaitingState() {
+        VacancyReply reply = dispatcher.commandDispatch(createCommand(CommandType.SET_REGION, ""));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.REGION_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(REGION_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.WAITING_SET_REGION);
+    }
+
+    @Test
+    @DisplayName("SET_REGION: с валидным аргументом обновляет регион")
+    void setRegion_withValidArg_shouldUpdateRegion() {
+        dispatcher.commandDispatch(createCommand(CommandType.SET_REGION, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_REGION, "77"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.SETTING_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(UPDATE_REGION_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.CLEAN);
+        assertThat(userService.getOrCreateUser(USER_ID).getSettings().getRegionCode())
+                .isEqualTo(77);
+    }
+
+    @Test
+    @DisplayName("SET_REGION: с невалидным аргументом показывает ошибку")
+    void setRegion_withInvalidArg_shouldShowError() {
+        dispatcher.commandDispatch(createCommand(CommandType.SET_REGION, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_REGION, "Москва"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.REGION_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(ERROR_REGION_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.WAITING_SET_REGION);
+    }
+
+    @Test
+    @DisplayName("CHANGE_REGION_PAGE: передаёт номер страницы")
+    void changeRegionPage_shouldPassPageNumber() {
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.CHANGE_REGION_PAGE, "1"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.REGION_KEYBOARD);
+        assertThat(reply.text()).isEqualTo("1");
+    }
+
+    @Test
+    @DisplayName("SET_MIN_EXPERIENCE: при CLEAN состоянии переводит в WAITING")
+    void setExperience_whenClean_shouldSetWaitingState() {
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_MIN_EXPERIENCE, ""));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.MIN_EXPERIENCE_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(EXPERIENCE_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID))
+                .isEqualTo(UserSettingState.WAITING_SET_MIN_EXPERIENCE);
+    }
+
+    @Test
+    @DisplayName("SET_MIN_EXPERIENCE: с валидным аргументом обновляет опыт")
+    void setExperience_withValidArg_shouldUpdateExperience() {
+        dispatcher.commandDispatch(createCommand(CommandType.SET_MIN_EXPERIENCE, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_MIN_EXPERIENCE, "5"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.SETTING_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(UPDATE_EXPERIENCE_MESSAGE);
+        assertThat(userService.getOrCreateUser(USER_ID).getSettings().getExperienceFrom())
+                .isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("SET_MIN_SALARY: при CLEAN состоянии переводит в WAITING")
+    void setSalary_whenClean_shouldSetWaitingState() {
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_MIN_SALARY, ""));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.MIN_SALARY_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(SALARY_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID))
+                .isEqualTo(UserSettingState.WAITING_SET_MIN_SALARY);
+    }
+
+    @Test
+    @DisplayName("SET_MIN_SALARY: с валидным аргументом обновляет зарплату")
+    void setSalary_withValidArg_shouldUpdateSalary() {
+        dispatcher.commandDispatch(createCommand(CommandType.SET_MIN_SALARY, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_MIN_SALARY, "150000"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.SETTING_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(UPDATE_SALARY_MESSAGE);
+        assertThat(userService.getOrCreateUser(USER_ID).getSettings().getSalaryFrom())
+                .isEqualTo(150000);
+    }
+
+    @Test
+    @DisplayName("SET_KEYWORD: при CLEAN состоянии переводит в WAITING")
+    void setKeyword_whenClean_shouldSetWaitingState() {
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_KEYWORD, ""));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.KEY_WORD_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(KEYWORD_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID))
+                .isEqualTo(UserSettingState.WAITING_SET_KEYWORD);
+    }
+
+    @Test
+    @DisplayName("SET_KEYWORD: с аргументом обновляет ключевое слово")
+    void setKeyword_withArg_shouldUpdateKeyword() {
+        dispatcher.commandDispatch(createCommand(CommandType.SET_KEYWORD, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_KEYWORD, "Python Developer"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.SETTING_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(UPDATE_KEYWORD_MESSAGE);
+        assertThat(userService.getOrCreateUser(USER_ID).getSettings().getWordForSearch())
+                .isEqualTo("Python Developer");
+    }
+
+    @Test
+    @DisplayName("SET_NOTIFY_TIME: при CLEAN состоянии переводит в WAITING")
+    void setNotifyTime_whenClean_shouldSetWaitingState() {
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_NOTIFY_TIME, ""));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(NOTIFY_TIME_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID))
+                .isEqualTo(UserSettingState.WAITING_SET_NOTIFY_TIME);
+    }
+
+    @Test
+    @DisplayName("SET_NOTIFY_TIME: с валидным временем HH:MM обновляет время")
+    void setNotifyTime_withValidTime_shouldUpdateTime() {
+        dispatcher.commandDispatch(createCommand(CommandType.SET_NOTIFY_TIME, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_NOTIFY_TIME, "14:30"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.SETTING_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(UPDATE_NOTIFY_TIME_MESSAGE);
+        assertThat(userService.getOrCreateUser(USER_ID).getSettings().getNotificationTime())
+                .isEqualTo(LocalTime.parse("14:30"));
+    }
+
+    @Test
+    @DisplayName("SET_NOTIFY_TIME: с валидным временем H M обновляет время")
+    void setNotifyTime_withValidTimeWithSpace_shouldUpdateTime() {
+        dispatcher.commandDispatch(createCommand(CommandType.SET_NOTIFY_TIME, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_NOTIFY_TIME, "14 30"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.SETTING_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(UPDATE_NOTIFY_TIME_MESSAGE);
+        assertThat(userService.getOrCreateUser(USER_ID).getSettings().getNotificationTime())
+                .isEqualTo(LocalTime.parse("14:30"));
+    }
+
+    @Test
+    @DisplayName("SET_NOTIFY_TIME: с невалидным временем показывает ошибку")
+    void setNotifyTime_withInvalidTime_shouldShowError() {
+        dispatcher.commandDispatch(createCommand(CommandType.SET_NOTIFY_TIME, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.SET_NOTIFY_TIME, "полдень"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(ERROR_NOTIFY_TIME_MESSAGE);
+    }
+
+    @Test
+    @DisplayName("CHANGE_NOTIFY_PAGE: передаёт номер страницы")
+    void changeNotifyPage_shouldPassPageNumber() {
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.CHANGE_NOTIFY_PAGE, "3"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.NOTIFY_TIME_KEYBOARD);
+        assertThat(reply.text()).isEqualTo("3");
+    }
+
+    @Test
+    @DisplayName("READY: при CLEAN и готовых настройках переводит в WAITING_READY")
+    void ready_whenCleanAndSettingsReady_shouldSetWaitingReady() {
+        VacancyReply reply = dispatcher.commandDispatch(createCommand(CommandType.READY, ""));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.READY_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(READY_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID))
+                .isEqualTo(UserSettingState.WAITING_READY_COMMAND);
+    }
+
+    @Test
+    @DisplayName("READY: с COMPLETE запускает планировщик")
+    void ready_withComplete_shouldStartScheduler() {
+        dispatcher.commandDispatch(createCommand(CommandType.READY, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.READY, ReadyAction.COMPLETE.getTitle()));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.STOP_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(READY_START_MESSAGE);
+        assertThat(userService.getStateSessionOrDefault(USER_ID))
+                .isEqualTo(VacancySessionState.ACTIVE);
+
+        verify(notificationService).scheduleNotifications(any(User.class));
+    }
+
+    @Test
+    @DisplayName("READY: с GO_BACK возвращает в настройки")
+    void ready_withGoBack_shouldReturnToSettings() {
+        dispatcher.commandDispatch(createCommand(CommandType.READY, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.READY, ReadyAction.GO_BACK.getTitle()));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.SETTING_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(BACK_INTO_SETTINGS_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.CLEAN);
+    }
+
+    @Test
+    @DisplayName("STOP: при CLEAN переводит в WAITING_STOP")
+    void stop_whenClean_shouldSetWaitingStop() {
+        VacancyReply reply = dispatcher.commandDispatch(createCommand(CommandType.STOP, ""));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(STOP_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID))
+                .isEqualTo(UserSettingState.WAITING_STOP_COMMAND);
+    }
+
+    @Test
+    @DisplayName("STOP: с YES удаляет пользователя")
+    void stop_withYes_shouldDeleteUser() {
+        dispatcher.commandDispatch(createCommand(CommandType.STOP, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.STOP, ReadyAction.YES.getTitle()));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.START_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(SUCCESSFUL_STOP_MESSAGE);
+        verify(notificationService).cancelNotifications(USER_ID);
+        assertThat(userRepository.findById(USER_ID)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("STOP: с NO возвращает в активное состояние")
+    void stop_withNo_shouldReturnToActive() {
+        dispatcher.commandDispatch(createCommand(CommandType.STOP, ""));
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.STOP, ReadyAction.NO.getTitle()));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.STOP_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(CONTINUE_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.CLEAN);
+    }
+
+    @Test
+    @DisplayName("HOME: при CLEAN и CONFIGURING переводит в WAITING_HOME")
+    void home_whenCleanAndConfiguring_shouldSetWaitingHome() {
+        userService.setStateSession(USER_ID, VacancySessionState.CONFIGURING);
+
+        VacancyReply reply = dispatcher.commandDispatch(createCommand(CommandType.HOME, ""));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(HOME_MESSAGE_WHEN_CONFIGURING);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.WAITING_HOME_COMMAND);
+    }
+
+    @Test
+    @DisplayName("HOME: при CLEAN и ACTIVE отправляет сообщение без изменения состояния")
+    void home_whenCleanAndActive_shouldSendMessageWithoutStateChange() {
+        userService.setStateSession(USER_ID, VacancySessionState.ACTIVE);
+        UserSettingState stateBefore = userService.getSettingState(USER_ID);
+
+        VacancyReply reply = dispatcher.commandDispatch(createCommand(CommandType.HOME, ""));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.ROUTER_MENU_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(HOME_MESSAGE_WHEN_ACTIVE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(stateBefore);
+    }
+
+    @Test
+    @DisplayName("HOME: с YES удаляет пользователя и возвращает в главное меню")
+    void home_withYes_shouldDeleteUserAndReturnToMainMenu() {
+
+        userService.updateSettingState(USER_ID, UserSettingState.WAITING_HOME_COMMAND);
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.HOME, ReadyAction.YES.getTitle()));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.ROUTER_MENU_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(SUCCESSFUL_HOME_MESSAGE);
+        assertThat(userService.getStateSessionOrDefault(USER_ID)).isEqualTo(VacancySessionState.INACTIVE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.NOT_INITIALIZED);
+        assertThat(userRepository.findById(USER_ID)).isEmpty();
+        verify(notificationService).cancelNotifications(USER_ID);
+    }
+
+    @Test
+    @DisplayName("HOME: с NO возвращает в настройки")
+    void home_withNo_shouldReturnToSettings() {
+
+        userService.updateSettingState(USER_ID, UserSettingState.WAITING_HOME_COMMAND);
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.HOME, ReadyAction.NO.getTitle()));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.SETTING_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(CONTINUE_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.CLEAN);
+        verify(notificationService, never()).cancelNotifications(any());
+    }
+
+    @Test
+    @DisplayName("HOME: с неизвестным аргументом показывает ошибку")
+    void home_withUnknownArg_shouldShowError() {
+
+        userService.updateSettingState(USER_ID, UserSettingState.WAITING_HOME_COMMAND);
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.HOME, "что-то странное"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(ERROR_STOP_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.WAITING_HOME_COMMAND);
+    }
+
+    @Test
+    @DisplayName("HOME: с неизвестным аргументом в CLEAN/INACTIVE возвращает ошибку")
+    void home_withUnknownArg_whenCleanAndInactive_shouldReturnError() {
+        userService.updateSettingState(USER_ID, UserSettingState.CLEAN);
+        userService.setStateSession(USER_ID, VacancySessionState.INACTIVE);
+
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.HOME, "что-то странное"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.YES_OR_NO_KEYBOARD);
+        assertThat(reply.text()).isEqualTo(ERROR_STOP_MESSAGE);
+        assertThat(userService.getSettingState(USER_ID)).isEqualTo(UserSettingState.CLEAN);
+    }
+
+    @Test
+    @DisplayName("UNKNOWN: возвращает сообщение о неизвестной команде")
+    void unknown_shouldReturnUnknownMessage() {
+        VacancyReply reply = dispatcher.commandDispatch(
+                createCommand(CommandType.UNKNOWN, "что-то странное"));
+
+        assertThat(reply.keyboardKey()).isEqualTo(VacancyKeyboardKey.NONE);
+        assertThat(reply.text()).isEqualTo(UNKNOWN_MESSAGE);
+    }
+
+    @Test
+    @DisplayName("Конструктор бросает исключение при null параметрах")
+    void constructor_shouldThrowException_whenParamsNull() {
+        assertThatThrownBy(() -> new VacancyCommandDispatcher(null, notificationService))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("userService не может быть null");
 
-        assertThatThrownBy(() ->
-                new VacancyCommandDispatcher(userService, null))
+        assertThatThrownBy(() -> new VacancyCommandDispatcher(userService, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("notificationService не может быть null");
     }
 
     @Test
-    @DisplayName("Проверка выброса исключения, когда в commandDispatch подаётся null")
-    void commandDispatch_shouldThrowsIllegalArgumentException_whenInputValuesInvalid() {
-        assertThatThrownBy(() ->
-                dispatcher.commandDispatch(null))
+    @DisplayName("commandDispatch бросает исключение при null commandDto")
+    void commandDispatch_shouldThrowException_whenCommandDtoNull() {
+        assertThatThrownBy(() -> dispatcher.commandDispatch(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("commandDto не может быть null");
-
-    }
-
-    private boolean equalsCurrentSettingStateWith(UserSettingState checkingState) {
-        return userService.getSettingState(USER_ID) == checkingState;
     }
 }

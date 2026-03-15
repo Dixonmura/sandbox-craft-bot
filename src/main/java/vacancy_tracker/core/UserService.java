@@ -1,5 +1,11 @@
 package vacancy_tracker.core;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import vacancy_tracker.data.repository.SessionStateRepository;
+import vacancy_tracker.data.repository.UserRepository;
+
+import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.Map;
@@ -11,14 +17,19 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class UserService {
 
+    private static final Logger log = LogManager.getLogger(UserService.class);
+
     private final UserRepository repository;
+    private final SessionStateRepository sessionRepository;
     private final Map<Long, VacancySessionState> sessionStates = new ConcurrentHashMap<>();
 
-    public UserService(UserRepository repository) {
+    public UserService(UserRepository repository, SessionStateRepository sessionRepository) {
         if (repository == null) {
             throw new IllegalArgumentException("Repository не может быть null");
         }
         this.repository = repository;
+        this.sessionRepository = sessionRepository;
+        restoreSessions();
     }
 
     /**
@@ -34,7 +45,6 @@ public class UserService {
                 () -> {
                     User newUser = new User(userId);
                     newUser.updateUtcOffset(ZoneOffset.ofHours(3));
-                    repository.saveUser(newUser);
                     return newUser;
                 }
         );
@@ -151,6 +161,24 @@ public class UserService {
     }
 
     /**
+     * Обновляет дату и время последнего запроса к серверу.
+     * Если пользователь с таким id не найден, будет создан новый.
+     * Бросает IllegalArgumentException, если userid или lastRequestTime null.
+     */
+    public User updateLastRequestTime(Long userId, Instant lastRequestTime) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId не может быть null");
+        }
+        if (lastRequestTime == null) {
+            throw new IllegalArgumentException("lastRequestTime не может быть null");
+        }
+        User user = getOrCreateUser(userId);
+        user.updateLastRequestTime(lastRequestTime);
+        repository.saveUser(user);
+        return user;
+    }
+
+    /**
      * Обновляет состояние пользователя для поиска вакансий.
      * Если пользователь с таким userId не найден, будет создан новый.
      * Бросает IllegalArgumentException, если userId null.
@@ -169,7 +197,7 @@ public class UserService {
     }
 
     /**
-     * Устанавливает состояние сессии для пользователя.
+     * Устанавливает состояние сессии для пользователя и сохраняет его в репозитории.
      * Бросает IllegalArgumentException, если userId или sessionState null.
      */
     public void setStateSession(Long userId, VacancySessionState sessionState) {
@@ -180,10 +208,11 @@ public class UserService {
             throw new IllegalArgumentException("sessionState не может быть null");
         }
         sessionStates.put(userId, sessionState);
+        sessionRepository.save(userId, sessionState);
     }
 
     /**
-     * Удаляет пользователя из репозитория.
+     * Удаляет пользователя и состояние сессии из репозитория.
      *
      * @param userId ID пользователя для удаления
      * @throws IllegalArgumentException если userId == null
@@ -192,8 +221,8 @@ public class UserService {
         if (userId == null) {
             throw new IllegalArgumentException("userId не может быть null");
         }
-        getOrCreateUser(userId);
         repository.deleteUser(userId);
+        sessionRepository.delete(userId);
     }
 
     /**
@@ -218,5 +247,13 @@ public class UserService {
             throw new IllegalArgumentException("userId не может быть null");
         }
         return sessionStates.getOrDefault(userId, VacancySessionState.INACTIVE);
+    }
+
+    /**
+     * Восстанавливает состояние всех существующих в репозитории сессий
+     */
+    private void restoreSessions() {
+        sessionStates.putAll(sessionRepository.findAll());
+        log.info("Восстановлено {} сессий", sessionStates.size());
     }
 }

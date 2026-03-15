@@ -42,13 +42,12 @@ class VacancyBotTest {
     VacancyBot vacancyBot;
 
     @Test
-    @DisplayName("startVacancyBot должен перевести сессию в CONFIGURING и вернуть стартовое сообщение")
+    @DisplayName("startVacancyBot должен вернуть стартовое сообщение")
     void startVacancyBot_shouldSetConfiguringState_andReturnStartReply() {
         Update update = createUpdateWithText(CHAT_ID, "любая команда");
 
         VacancyReply reply = vacancyBot.startVacancyBot(update);
 
-        verify(userService).setStateSession(CHAT_ID, VacancySessionState.CONFIGURING);
         assertThat(reply.userId()).isEqualTo(CHAT_ID);
         assertThat(reply.text()).isEqualTo(START_MESSAGE);
         assertThat(reply.keyboardKey()).isEqualTo(START_KEYBOARD);

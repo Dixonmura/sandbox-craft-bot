@@ -3,6 +3,7 @@ package vacancy_tracker.core;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,6 +68,14 @@ class UserSettingsTest {
         userSettings.updateNotificationTime(LocalTime.parse("07:00"));
         assertThat(userSettings.getNotificationTime())
                 .isEqualTo(LocalTime.parse("07:00"));
+
+        assertThat(userSettings.getLastRequestTime()).isNull();
+
+        Instant instant = Instant.parse("2026-03-10T15:00:00Z");
+        userSettings.updateRequestTime(instant);
+        assertThat(userSettings.getLastRequestTime())
+                .isNotNull()
+                .isEqualTo(instant);
     }
 
     @Test

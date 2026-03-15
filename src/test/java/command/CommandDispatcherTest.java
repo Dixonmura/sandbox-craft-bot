@@ -21,10 +21,11 @@ import pomodoro.bot.PomodoroSender;
 import vacancy_tracker.bot.VacancyBot;
 import vacancy_tracker.bot.VacancyMessages;
 import vacancy_tracker.core.ScheduledNotificationService;
-import vacancy_tracker.core.TrudVsemVacancySearchService;
 import vacancy_tracker.core.UserService;
-import vacancy_tracker.core.VacancySearchService;
-import vacancy_tracker.data.InMemoryUserRepository;
+import vacancy_tracker.data.json.JsonSessionStateRepository;
+import vacancy_tracker.data.json.JsonUserRepository;
+import vacancy_tracker.data.repository.SessionStateRepository;
+import vacancy_tracker.data.repository.UserRepository;
 import vacancy_tracker.presentation.UpdateMapper;
 import vacancy_tracker.presentation.UserCommandParser;
 import vacancy_tracker.presentation.VacancyCommandDispatcher;
@@ -44,6 +45,8 @@ class CommandDispatcherTest {
     UserService userService;
     @Mock
     ScheduledNotificationService notificationService;
+    UserRepository userRepository;
+    SessionStateRepository stateRepository;
     MovieQuizBot movieQuizBot;
     PomodoroBot pomodoroBot;
     VacancyBot vacancyBot;
@@ -51,7 +54,9 @@ class CommandDispatcherTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(new InMemoryUserRepository());
+        userRepository = new JsonUserRepository();
+        stateRepository = new JsonSessionStateRepository();
+        userService = new UserService(userRepository, stateRepository);
         movieQuizBot = new MovieQuizBot();
         pomodoroBot = new PomodoroBot(pomodoroSender);
         vacancyBot = new VacancyBot(

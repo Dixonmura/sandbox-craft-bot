@@ -362,13 +362,13 @@ class VacancyTrackerKeyboardFactoryTest {
                 .isEqualTo(ReadyAction.YES.getTitle());
 
         assertThat(row.getFirst().getCallbackData())
-                .isEqualTo(CallbackPrefixes.YES_OR_NO_PREFIX + ReadyAction.YES);
+                .isEqualTo(CallbackPrefixes.YES_OR_NO_PREFIX + ReadyAction.YES.getTitle());
 
         assertThat(row.getLast().getText())
                 .isEqualTo(ReadyAction.NO.getTitle());
 
         assertThat(row.getLast().getCallbackData())
-                .isEqualTo(CallbackPrefixes.YES_OR_NO_PREFIX + ReadyAction.NO);
+                .isEqualTo(CallbackPrefixes.YES_OR_NO_PREFIX + ReadyAction.NO.getTitle());
     }
 
     @Test

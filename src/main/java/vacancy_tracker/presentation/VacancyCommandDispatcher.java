@@ -194,6 +194,7 @@ public class VacancyCommandDispatcher {
                         userService.setStateSession(userId, VacancySessionState.INACTIVE);
                         notificationService.cancelNotifications(userId);
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
+                        userService.deleteUser(userId);
                         yield new VacancyReply(userId, SUCCESSFUL_STOP_MESSAGE, VacancyKeyboardKey.START_KEYBOARD);
                     } else if (ReadyAction.NO.getTitle().equals(arguments)) {
                         userService.updateSettingState(userId, UserSettingState.CLEAN);
