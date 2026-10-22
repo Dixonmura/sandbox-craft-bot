@@ -11,7 +11,7 @@ import vacancy_tracker.bot.types.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.apache.commons.lang3.math.NumberUtils.min;
+import static java.lang.Math.min;
 import static vacancy_tracker.bot.CallbackPrefixes.*;
 import static vacancy_tracker.bot.types.ReadyAction.COMPLETE;
 import static vacancy_tracker.bot.types.ReadyAction.GO_BACK;
