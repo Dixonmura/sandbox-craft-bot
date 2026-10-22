@@ -19,7 +19,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <mockito.version>5.24.0</mockito.version>
-        <surefire.version>3.5.3</surefire.version>
+        <surefire.version>3.6.0</surefire.version>
         <log4j.version>2.25.3</log4j.version>
     </properties>
 
