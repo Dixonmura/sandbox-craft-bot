@@ -26,8 +26,8 @@
 
 1. **Клонировать репозиторий**
    \`\`\`bash
-   git clone https://gitlab.com/your-project/sandbox-multi-bot.git
-   cd sandbox-multi-bot
+   git clone https://github.com/Dixonmura/sandbox-craft-bot.git
+   cd sandbox-craft-bot
    \`\`\`
 
 2. **Установить токен бота**
