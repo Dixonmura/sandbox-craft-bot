@@ -60,4 +60,4 @@
 
 ---
 
-**Полный список изменений:** [3.0.0](https://gitlab.com/your-project/compare/v2.0.1...v3.0.0)
+**История изменений версии 3.0.0:** [Pull Request #1](https://github.com/Dixonmura/sandbox-craft-bot/pull/1)
